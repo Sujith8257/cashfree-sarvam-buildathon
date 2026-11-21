@@ -20,6 +20,7 @@ import cashfree_status
 import cashfree_webhook
 import contact_preferences
 import payment_store as store
+import promise_reminders as promises
 from review_notes import router as notes_router
 from queue_balance import installment_id, outreach_state, to_paise
 
@@ -206,10 +207,12 @@ def queue_entry(record, now, preference_for=contact_preferences.for_phone):
             due_reason = (f"{days} day(s) overdue" if days > 0 else
                           "due today" if days == 0 else f"due in {-days} day(s), reminder")
             status, reason = "would_call", f"{reason}; {due_reason}" if reason else due_reason
+    status, reason = promises.apply_to_queue(record, now, status, reason)
     return {"installment_id": record["installment_id"], "customer_id": record["customer_id"],
             "name": record["name"], "due_date": record["due_date"], "days_overdue": max(0, days),
             "outstanding_amount": (record["amount_paise"] - record["paid_paise"]) / 100,
             "paid_amount": record["paid_paise"] / 100, "callback_at": record["callback_at"],
+            **({"promise": record["promise"]} if "promise" in record else {}),
             "status": status, "reason": reason, "contact_preference": preference}
 
 
@@ -385,6 +388,21 @@ def stop_outreach(iid: str, request: contact_preferences.Request):
 
 class CallbackRequest(BaseModel):
     callback_at: datetime
+
+
+@queue_api.post("/{iid}/promise")
+def record_promise(iid: str, request: promises.PromiseRequest):
+    """Record a borrower's promise to pay INR on this installment. It never credits money or schedules a call."""
+    now = now_ist()
+    try:
+        record = promises.record_promise(iid, request, now)
+    except KeyError:
+        raise HTTPException(404, "Installment not found") from None
+    except promises.ActivePromiseError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return queue_entry(record, now)
 
 
 @queue_api.post("/{iid}/callback")

@@ -7,6 +7,10 @@ from datetime import date, datetime
 from pathlib import Path
 
 
+_INSTALLMENTS = """SELECT i.*, p.promise_at, p.promised_paise, p.baseline_paid_paise
+                   FROM installments i LEFT JOIN payment_promises p USING (installment_id)"""
+
+
 def database_path():
     return os.getenv("COLLECTIONS_DB") or Path(__file__).with_name("collections.sqlite3")
 
@@ -26,6 +30,12 @@ def _connection(*, write=False):
             claimed_paid INTEGER NOT NULL DEFAULT 0 CHECK (claimed_paid IN (0, 1)),
             callback_at TEXT
         )""")
+        db.execute("""CREATE TABLE IF NOT EXISTS payment_promises (
+            installment_id TEXT PRIMARY KEY NOT NULL REFERENCES installments(installment_id),
+            promise_at TEXT NOT NULL,
+            promised_paise INTEGER NOT NULL CHECK (promised_paise > 0),
+            baseline_paid_paise INTEGER NOT NULL CHECK (baseline_paid_paise >= 0)
+        )""")
         if write:
             # Keep a decision based on stored state and its write in one transaction.
             db.execute("BEGIN IMMEDIATE")
@@ -33,11 +43,15 @@ def _connection(*, write=False):
 
 
 def _record(row):
-    return {**dict(row), "link_id": f"emi-{row['installment_id']}", "claimed_paid": bool(row["claimed_paid"])}
+    record = dict(row)
+    promise = {key: record.pop(key) for key in ("promise_at", "promised_paise", "baseline_paid_paise")}
+    if promise["promise_at"] is not None:
+        record["promise"] = promise
+    return {**record, "link_id": f"emi-{row['installment_id']}", "claimed_paid": bool(row["claimed_paid"])}
 
 
 def _get(db, installment_id):
-    row = db.execute("SELECT * FROM installments WHERE installment_id = ?", (installment_id,)).fetchone()
+    row = db.execute(_INSTALLMENTS + " WHERE i.installment_id = ?", (installment_id,)).fetchone()
     return _record(row) if row is not None else None
 
 
@@ -48,7 +62,7 @@ def get(installment_id: str) -> dict | None:
 
 def all_installments() -> list[dict]:
     with _connection() as db:
-        return [_record(row) for row in db.execute("SELECT * FROM installments ORDER BY rowid")]
+        return [_record(row) for row in db.execute(_INSTALLMENTS + " ORDER BY i.rowid")]
 
 
 def _validate_paise(value):
