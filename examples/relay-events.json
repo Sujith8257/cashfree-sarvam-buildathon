@@ -1,0 +1,38 @@
+[
+  {
+    "data": {
+      "event": "start_collection_call",
+      "request_id": "demo-call-001",
+      "borrower_id": "DEMO-BORROWER",
+      "installment_id": "DEMO-INSTALLMENT",
+      "borrower_name": "Demo Borrower",
+      "phone": "<VERIFIED_TEST_RECIPIENT_E164>",
+      "preferred_language": "Kannada",
+      "amount_due": 1200,
+      "currency": "INR",
+      "days_past_due": 3
+    }
+  },
+  {
+    "data": {
+      "event": "create_payment_link",
+      "request_id": "demo-link-001",
+      "borrower_id": "DEMO-BORROWER",
+      "installment_id": "DEMO-INSTALLMENT",
+      "borrower_name": "Demo Borrower",
+      "phone": "<VERIFIED_TEST_RECIPIENT_E164>",
+      "amount_due": 1200,
+      "currency": "INR",
+      "link_id": "demo-installment-link"
+    }
+  },
+  {
+    "data": {
+      "event": "fetch_payment_status",
+      "request_id": "demo-status-001",
+      "borrower_id": "DEMO-BORROWER",
+      "installment_id": "DEMO-INSTALLMENT",
+      "link_id": "demo-installment-link"
+    }
+  }
+]
