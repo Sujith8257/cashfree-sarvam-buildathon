@@ -124,6 +124,66 @@ def test_notebook_preview_ranks_only_eligible_borrowers_by_due_date(monkeypatch)
     assert queue[0]["reason"] == body["results"][3]["reason"]
 
 
+def call_notebook_live(monkeypatch, rows, query=""):
+    sent = []
+
+    class Ok:
+        status_code = 200
+
+    monkeypatch.setattr(t, "read_notebook", lambda *args: rows)
+    monkeypatch.setattr(t.requests, "post", lambda url, json, **kwargs: sent.append(json) or Ok())
+    response = TestClient(t.app).post(f"/trigger/notebook{query}", files={"file": ("page.png", b"fixture", "image/png")},
+                                      headers={"X-API-Key": "test-trigger-key"})
+    assert response.status_code == 200
+    return response.json(), [s["customer_id"] for s in sent]
+
+
+LIVE_ROWS = [row(customer_id="tomorrow", phone_number="9876500001", due_date="2026-11-22"),
+             row(customer_id="late", phone_number="9876500002", due_date="2026-11-20")]
+
+
+def test_live_notebook_calls_most_overdue_first_within_call_budget(monkeypatch):
+    monkeypatch.setattr(t, "check_and_call", partial(t.check_and_call, now=NOON))
+    body, called = call_notebook_live(monkeypatch, LIVE_ROWS, "?max_calls=1")
+    assert called == ["late"]
+    assert body["calls"] == 1
+    tomorrow, late = body["results"]
+    assert late["status"] == "call_triggered"
+    assert tomorrow["status"] == "skipped"
+    assert tomorrow["reason"] == "call budget of 1 reached"
+    assert t.store.get(tomorrow["installment_id"]) is not None
+    assert t.dispatch_ledger.state((tomorrow["installment_id"], "2026-11-21")) is None
+
+
+def test_live_notebook_without_budget_calls_everyone_most_overdue_first(monkeypatch):
+    monkeypatch.setattr(t, "check_and_call", partial(t.check_and_call, now=NOON))
+    body, called = call_notebook_live(monkeypatch, LIVE_ROWS)
+    assert called == ["late", "tomorrow"]
+    assert [r["status"] for r in body["results"]] == ["call_triggered", "call_triggered"]
+
+
+def test_budget_slot_passes_to_next_row_when_ranked_row_turns_ineligible(monkeypatch):
+    late_iid = t.installment_id("late", "9876500002", "2026-11-20")
+    real = t.check_and_call
+
+    def check(row, dry_run):
+        if not dry_run and row["customer_id"] == "late":
+            t.store.mark_claim(late_iid)  # Borrower reports payment after ranking, before dispatch.
+        return real(row, dry_run, now=NOON)
+
+    monkeypatch.setattr(t, "check_and_call", check)
+    body, called = call_notebook_live(monkeypatch, LIVE_ROWS, "?max_calls=1")
+    assert called == ["tomorrow"]
+    assert [r["status"] for r in body["results"]] == ["call_triggered", "payment_hold"]
+
+
+def test_call_budget_must_be_positive(monkeypatch):
+    monkeypatch.setattr(t, "read_notebook", lambda *args: pytest.fail("Invalid budget reached OCR"))
+    response = TestClient(t.app).post("/trigger/notebook?max_calls=0", files={"file": ("page.png", b"fixture", "image/png")},
+                                      headers={"X-API-Key": "test-trigger-key"})
+    assert response.status_code == 422
+
+
 def test_same_borrower_is_called_once_per_day(monkeypatch):
     sent = []
 
