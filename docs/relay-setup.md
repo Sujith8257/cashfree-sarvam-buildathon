@@ -16,6 +16,7 @@ Use **Inbound Webhook** as the trigger. Seed **Update initial Data** with a samp
 | `start_collection_call` | HTTP POST to Sarvam Instant Outbound | Use the committed agent version, telephony connection, caller number, and the validated profile phone and language. Map name, amount, and days past due to the agent variables. |
 | `create_payment_link` | Cashfree Payments → Create Payment Link | Map the verified amount, name, phone, and stable installment link ID. Use INR and a short purpose. |
 | `fetch_payment_status` | Cashfree Payments → Fetch Payment Link Details | Map the stored link ID and use the returned status to reconcile the installment. |
+| `PAYMENT_LINK_EVENT` | Cashfree Payments -> Fetch Payment Link Details | Read the nested event link ID. Fetch Cashfree state before treating it as paid. |
 | Unrecognized event | End the flow | Record the unsupported event for troubleshooting. |
 
 Place the outbound call **inside its own route** before running the complete agent. Relay rejoins branches at their downstream continuation, so an HTTP call placed after the join can run for payment events.

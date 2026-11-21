@@ -15,9 +15,11 @@ A sandbox prototype for collecting overdue installments through multilingual voi
 | --- | --- |
 | Indus call | A direct Kannada phone test worked. Version 1 was committed and appeared in Indus's Instant Outbound picker. |
 | Relay test canvas | The signed-in sandbox canvas was inspected using Playwright. |
-| Outbound action | The isolated Relay HTTP action returned HTTP 200 and a Sarvam attempt ID with phone, name, amount, days past due, and starting language mapped from the webhook. A configured copy now sits in the dedicated call branch. Removing the original shared action and verifying call pickup and audio are pending. |
+| Outbound action | The isolated Relay HTTP action returned HTTP 200 and a Sarvam attempt ID with phone, name, amount, days past due, and starting language mapped from the webhook. The call action now sits only in the dedicated call branch. Pickup and audio for a Relay-triggered call remain unverified. |
 | Payment link | The route and native Create Payment Link action were configured with webhook field mappings. The sandbox connection was selected and the isolated node test succeeded. |
-| Payment status | The status lookup route and Fetch Payment Link Details action were configured with the webhook link ID. The isolated lookup succeeded against the sandbox link and returned the expected amount with zero paid. Checkout and payment-event verification remain pending. |
+| Payment status | The status lookup route and Fetch Payment Link Details action were configured with the webhook link ID. Cashfree checkout succeeded. A full Relay status run and a separate run with a sample payment event both fetched PAID and the full INR 1,200 from Cashfree. |
+
+The Relay agent is still a draft. Live webhook delivery, the Indus in-call tool, and persistent borrower-queue updates remain pending.
 
 [Relay setup runbook](docs/relay-setup.md) · [Webhook contract](docs/webhook-contract.md) · [Sample requests](examples/relay-events.json)
 
