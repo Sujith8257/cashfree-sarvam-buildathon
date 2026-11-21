@@ -1,6 +1,6 @@
 # Lender queue: a 10-minute local demo
 
-Open **[the lender screen](http://127.0.0.1:8000/lender)** after starting the server below. The manager's question is: *Who can I call next, and how much do they still owe?* The PowerShell path shows the same queue without screenshots, OCR, or a voice call.
+After starting the server below, read the queue with `GET /queue` (the React dashboard's call queue shows it too; see [frontend/README.md](../frontend/README.md)) and run actions from the API's interactive [`/docs`](http://127.0.0.1:8000/docs) page. The manager's question is: *Who can I call next, and how much do they still owe?* The PowerShell path shows the same queue without screenshots, OCR, or a voice call.
 
 ## 1. Start a fresh queue (server PowerShell)
 
@@ -14,7 +14,7 @@ $env:COLLECTIONS_DB = Join-Path $env:TEMP ("lender-demo-{0}.sqlite3" -f [guid]::
 python -m uvicorn trigger_api:app --host 127.0.0.1 --port 8000
 ```
 
-At `GET /lender`, enter the trigger key under **API key → Load queue**. API requests below send it as `X-API-Key`, never in a URL. `COLLECTIONS_DB` selects the SQLite file; the default is `calltrigger-api/collections.sqlite3`.
+At `/docs`, enter the trigger key under **Authorize**. API requests below send it as `X-API-Key`, never in a URL. `COLLECTIONS_DB` selects the SQLite file; the default is `calltrigger-api/collections.sqlite3`.
 
 ## 2. Register Meera and Ravi (client PowerShell)
 
@@ -72,7 +72,7 @@ Show-Queue | Format-List
 python -m pytest -q calltrigger-api/test_lender_queue.py calltrigger-api/test_cashfree_status.py
 ```
 
-These tests use fixtures, not a Cashfree transaction. For an INR 1,200 installment, two refreshes reporting **INR 500 paid to date** leave **INR 700** outstanding both times. A later total of **INR 1,200** leaves zero, moves the paid row to `other`, and makes the next eligible borrower first. The tests use their own database, not the screen's data.
+These tests use fixtures, not a Cashfree transaction. For an INR 1,200 installment, two refreshes reporting **INR 500 paid to date** leave **INR 700** outstanding both times. A later total of **INR 1,200** leaves zero, moves the paid row to `other`, and makes the next eligible borrower first. The tests use their own database, not the server's data.
 
 **Sandbox proof:** Use this path only if a matching test link already exists. Supply `CASHFREE_PG_CLIENT_ID` and `CASHFREE_PG_CLIENT_SECRET` to the **server process only**, before starting it. In step 2 use the sandbox installment's synthetic profile and exact due date instead of the rolling date. To see a fully paid Meera give way to Ravi, run the refresh before step 3's holds, during calling hours.
 

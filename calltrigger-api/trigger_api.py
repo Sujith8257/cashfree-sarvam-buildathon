@@ -11,9 +11,7 @@ from urllib.parse import urlsplit
 import requests
 from dotenv import load_dotenv, set_key
 from fastapi import APIRouter, Depends, FastAPI, File, Form, HTTPException, Query, Security, UploadFile
-from fastapi.responses import FileResponse
 from fastapi.security import APIKeyHeader
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import cashfree_status
@@ -446,13 +444,6 @@ def schedule_callback(iid: str, request: CallbackRequest):
 
 queue_api.include_router(notes_router)
 app.include_router(queue_api)
-LENDER_DIR = Path(__file__).with_name("lender")
-app.mount("/lender/assets", StaticFiles(directory=LENDER_DIR), name="lender-assets")
-
-
-@app.get("/lender", include_in_schema=False)
-def lender_screen():
-    return FileResponse(LENDER_DIR / "index.html")
 
 
 if __name__ == "__main__":

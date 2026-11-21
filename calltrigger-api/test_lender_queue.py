@@ -202,6 +202,11 @@ def test_unknown_installment_actions_return_404_without_changing_known_debt(clie
     assert queue(client) == before
 
 
+def test_separate_lender_screen_is_gone_but_the_queue_api_remains(client):
+    assert client.get("/lender").status_code == 404
+    assert client.get("/queue").status_code == 200
+
+
 @pytest.mark.parametrize("headers", [{}, {"X-API-Key": "wrong"}], ids=["missing-key", "wrong-key"])
 def test_unauthorized_requests_cannot_read_or_mutate_the_queue(client, headers, monkeypatch):
     iid = seed_one(client)
