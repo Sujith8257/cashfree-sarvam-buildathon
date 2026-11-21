@@ -16,6 +16,10 @@ The tests use a temporary SQLite file, a dummy API key, a fixed IST clock and si
 
 ## Try the action locally
 
+At [`/lender`](http://127.0.0.1:8000/lender), load the queue and expand **Record a promise to pay** on an unpaid installment. Enter an INR amount and a future deadline on the **IST** clock. After saving, the row shows the recorded agreement and the unchanged verified balance. Use **Reload queue** to see a lapsed promise or a payment that has since been verified.
+
+For the same action in the API explorer:
+
 1. Start the [local demo and register a synthetic installment](lender-queue-demo.md#2-register-meera-and-ravi-client-powershell) using `dry_run=true`. Open `http://127.0.0.1:8000/docs`, choose **Authorize**, and enter the local `X-API-Key`.
 2. Open **POST `/queue/{iid}/promise`**. Paste the returned `installment_id`, choose a **future** date and time, and submit an amount no larger than the verified remaining balance. Example body (replace the date):
 

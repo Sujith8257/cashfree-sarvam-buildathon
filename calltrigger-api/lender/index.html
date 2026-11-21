@@ -78,6 +78,18 @@
       </div>
       <p class="decision"><strong class="status"></strong><span class="reason"></span></p>
       <p class="callback-time" hidden></p>
+      <details class="promise-control">
+        <summary>Record a promise to pay</summary>
+        <div class="action-body">
+          <p class="hint">Record what the borrower agreed to pay. This pauses collection contact without changing the verified balance.</p>
+          <form class="promise-form" method="post">
+            <div class="input-line"><label>Promised amount (INR)<input name="amount" type="number" inputmode="decimal" min="0.01" step="0.01" required></label></div>
+            <div class="input-line"><label>Payment deadline (IST, UTC+05:30)<input name="deadline" type="datetime-local" step="60" required></label></div>
+            <button type="submit">Record promise</button>
+          </form>
+          <p class="notice promise-note" role="status"></p>
+        </div>
+      </details>
       <details class="actions">
         <summary>Manage installment</summary>
         <div class="action-body">

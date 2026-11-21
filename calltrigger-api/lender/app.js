@@ -11,6 +11,7 @@
   const empty = ['No installments are eligible to call.', 'No installments are on hold or deferred.', 'No confirmed payments.'];
   const statuses = new Map(Object.entries({
     no_contact: 'No contact requested', hardship: 'Hardship reported',
+    promise_wait: 'Waiting for promised payment',
     would_call: 'Eligible to call', payment_hold: 'Payment claim on hold', callback_wait: 'Waiting for callback',
     not_due: 'Not due yet', blocked: 'Blocked', skipped: 'Skipped', paid: 'Payment confirmed', needs_check: 'Needs review'
   }));
@@ -72,7 +73,7 @@
     if (!active) load.textContent = loaded ? 'Reload queue' : 'Load queue';
     preview.disabled = !!active || !key.value.trim() || !file.files.length;
     $('#forget').hidden = !key.value;
-    for (const control of document.querySelectorAll('.actions button, .actions input')) control.disabled = !!active;
+    for (const control of document.querySelectorAll('.installment button, .installment input')) control.disabled = !!active;
   }
 
   function clearRecordView() {
@@ -136,6 +137,30 @@
     }
   }
 
+  function bindPromise(item, row, id, update) {
+    const details = $('.promise-control', item);
+    if (!id || id === '.' || id === '..' || row.status === 'paid' || row.status === 'promise_wait' || !(row.outstanding_amount > 0)) {
+      details.remove();
+      return;
+    }
+    $('summary', details).setAttribute('aria-label', `Record a promise to pay for ${row.name || 'this borrower'}, due ${dueDate(row.due_date)}`);
+    const form = $('.promise-form', details), when = form.elements.deadline, value = form.elements.amount;
+    value.max = String(row.outstanding_amount);
+    const setMin = () => { when.min = new Date((Math.floor(Date.now() / 60000) + 1 + 330) * 60000).toISOString().slice(0, 16); };
+    setMin();
+    when.addEventListener('focus', setMin);
+    when.addEventListener('input', () => when.setCustomValidity(''));
+    value.addEventListener('input', () => value.setCustomValidity(''));
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+      if (!/^\d+(?:\.\d{1,2})?$/.test(value.value)) { value.setCustomValidity('Enter an INR amount with up to two decimal places, such as 250.25.'); value.reportValidity(); return; }
+      const stamp = `${when.value}${when.value.length === 16 ? ':00' : ''}+05:30`;
+      if (!(Date.parse(stamp) > Date.now())) { when.setCustomValidity('Choose a future payment deadline in IST.'); when.reportValidity(); return; }
+      update($('button', form), 'Recording…', 'promise', 'Promise recorded',
+        { amount: value.value, promise_at: stamp }, $('.promise-note', details));
+    });
+  }
+
   function installment(row, rank) {
     const item = $('#row-template').content.firstElementChild.cloneNode(true);
     const name = row.name || 'Name unavailable', actions = $('.actions', item);
@@ -150,6 +175,7 @@
     if (row.callback_at && !row.contact_preference) { $('.callback-time', item).hidden = false; $('.callback-time', item).textContent = `Callback: ${time(row.callback_at)}`; }
 
     const id = String(row.installment_id ?? '').trim();
+    bindPromise(item, row, id, update);
     if (!id || id === '.' || id === '..') {
       const hint = document.createElement('p');
       hint.className = 'hint'; hint.textContent = 'No installment reference; actions unavailable.';
@@ -158,8 +184,8 @@
     }
     $('summary', actions).setAttribute('aria-label', `Manage installment for ${name}, due ${dueDate(row.due_date)}`);
     const output = $('.action-note', actions), callback = $('.callback-form', actions);
-    function update(button, label, action, success, body) {
-      run(button, label, output, async signal => {
+    function update(button, label, action, success, body, message = output) {
+      run(button, label, message, async signal => {
         const options = { method: 'POST' };
         if (body) { options.headers = { 'Content-Type': 'application/json' }; options.body = JSON.stringify(body); }
         await request(`/queue/${encodeURIComponent(id)}/${action}`, signal, options);
