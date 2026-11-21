@@ -1,5 +1,6 @@
 import os
 from datetime import date, datetime
+from functools import partial
 
 os.environ.setdefault("SARVAM_API_KEY", "test-sarvam-key")
 os.environ["TRIGGER_API_KEY"] = "test-trigger-key"
@@ -24,13 +25,14 @@ def row(**overrides):
 
 
 @pytest.fixture(autouse=True)
-def fresh_state():
-    t.triggered.clear()
+def fresh_state(tmp_path, monkeypatch):
+    monkeypatch.setenv("COLLECTIONS_DB", str(tmp_path / "queue.sqlite3"))
 
 
 def test_phone_with_country_code_and_hindi_digits_is_read():
     assert t.parse_phone("+91 ९८७६५४३२१०") == "9876543210"
     assert t.parse_phone("98765") is None
+    assert t.parse_phone("wrong:0019876543210") is None
 
 
 def test_indian_date_formats_are_read():
@@ -68,13 +70,67 @@ def test_nothing_outstanding_is_not_called():
     assert t.check_and_call(row(outstanding_amount=0), dry_run=True, now=NOON)["status"] == "skipped"
 
 
+def test_overpayment_is_not_registered_as_positive_debt():
+    assert t.check_and_call(row(outstanding_amount=-500), dry_run=True, now=NOON)["status"] == "skipped"
+
+
+def test_zero_balance_rescan_holds_existing_installment_without_verifying_payment():
+    t.check_and_call(row(), dry_run=True, now=NOON)
+    hold = t.check_and_call(row(outstanding_amount=0), dry_run=True, now=NOON)
+    assert hold["status"] == "payment_hold"
+    assert hold["paid_amount"] == 0
+    assert t.check_and_call(row(), dry_run=False, now=NOON)["status"] == "payment_hold"
+
+
+def test_preview_registers_installment_for_queue_even_outside_calling_hours(monkeypatch):
+    evening = NOON.replace(hour=20)
+    monkeypatch.setattr(t, "now_ist", lambda: evening, raising=False)
+    client = TestClient(t.app)
+    response = client.post("/trigger/call?dry_run=true", json=row(interest_rate=2),
+                           headers={"X-API-Key": "test-trigger-key"})
+    assert response.status_code == 200
+    installment = response.json()
+    assert installment["status"] == "blocked"
+    queue = client.get("/queue", headers={"X-API-Key": "test-trigger-key"})
+    assert queue.status_code == 200
+    assert queue.json()["call_queue"] == []
+    assert [r["installment_id"] for r in queue.json()["other"]] == [installment["installment_id"]]
+
+
+def test_notebook_preview_ranks_only_eligible_borrowers_by_due_date(monkeypatch):
+    rows = [
+        row(customer_id="tomorrow", due_date="2026-11-22"),
+        row(customer_id="today", due_date="2026-11-21"),
+        row(customer_id="paid", due_date="2026-11-01", outstanding_amount=0),
+        row(customer_id="late", name="Meera", due_date="16/11/2026", outstanding_amount=800),
+        row(customer_id="also-late", due_date="2026-11-16"),
+    ]
+    monkeypatch.setattr(t, "read_notebook", lambda *args: rows)
+    monkeypatch.setattr(t, "check_and_call", partial(t.check_and_call, now=NOON))
+    monkeypatch.setattr(t.requests, "post", lambda *a, **kw: pytest.fail("Preview tried to start a call"))
+
+    response = TestClient(t.app).post("/trigger/notebook", files={"file": ("page.png", b"fixture", "image/png")},
+                                      data={"dry_run": "true"}, headers={"X-API-Key": "test-trigger-key"})
+    assert response.status_code == 200
+    body = response.json()
+    assert "call_queue" in body
+    queue = body["call_queue"]
+    assert [(r["rank"], r["customer_id"]) for r in queue] == [
+        (1, "late"), (2, "also-late"), (3, "today"), (4, "tomorrow")]
+    assert queue[0]["name"] == "Meera"
+    assert queue[0]["outstanding_amount"] == 800
+    assert queue[0]["due_date"] == "2026-11-16"
+    assert [r["customer_id"] for r in body["results"]] == [r["customer_id"] for r in rows]
+    assert queue[0]["reason"] == body["results"][3]["reason"]
+
+
 def test_same_borrower_is_called_once_per_day(monkeypatch):
     sent = []
 
     class Ok:
-        ok = True
+        status_code = 200
 
-    monkeypatch.setattr(t.requests, "post", lambda url, json, headers, timeout: sent.append(json) or Ok())
+    monkeypatch.setattr(t.requests, "post", lambda url, json, **kwargs: sent.append(json) or Ok())
     assert t.check_and_call(row(), dry_run=False, now=NOON)["status"] == "call_triggered"
     assert t.check_and_call(row(), dry_run=False, now=NOON)["status"] == "skipped"
     assert len(sent) == 1
@@ -86,9 +142,9 @@ def test_relay_webhook_receives_customer_fields_and_call_mapping(monkeypatch):
     sent = []
 
     class Ok:
-        ok = True
+        status_code = 200
 
-    monkeypatch.setattr(t.requests, "post", lambda url, json, headers, timeout: sent.append(json) or Ok())
+    monkeypatch.setattr(t.requests, "post", lambda url, json, **kwargs: sent.append(json) or Ok())
     assert t.check_and_call(row(), dry_run=False, now=NOON)["status"] == "call_triggered"
 
     assert set(sent[0]) == {"data"}
