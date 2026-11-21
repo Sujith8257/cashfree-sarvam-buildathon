@@ -15,11 +15,11 @@ A sandbox prototype for collecting overdue installments through multilingual voi
 | --- | --- |
 | Indus call | A direct Kannada phone test worked. Version 1 was committed and appeared in Indus's Instant Outbound picker. |
 | Relay test canvas | The signed-in sandbox canvas was inspected using Playwright. |
-| Outbound action | The isolated Relay HTTP action returned HTTP 200 and a Sarvam attempt ID with phone, name, amount, days past due, and starting language mapped from the webhook. The call action now sits only in the dedicated call branch. Pickup and audio for a Relay-triggered call remain unverified. |
-| Payment link | The route and native Create Payment Link action were configured with webhook field mappings. The sandbox connection was selected and the isolated node test succeeded. |
+| Outbound action | The active sandbox copy accepted a live webhook, took the dedicated call branch, and returned HTTP 200 with an Indus attempt ID. The request used Indus v2 and the Kannada profile language. Pickup and audio for this run remain unverified. |
+| Payment link | The route and native Create Payment Link action were configured with webhook field mappings. The sandbox connection was selected. The active sandbox webhook also created a fresh payment link from a separate payment request event. |
 | Payment status | The status lookup route and Fetch Payment Link Details action were configured with the webhook link ID. Cashfree checkout succeeded. A full Relay status run and a separate run with a sample payment event both fetched PAID and the full INR 1,200 from Cashfree. |
 
-The Relay agent is still a draft. Live webhook delivery, the Indus in-call tool, and persistent borrower-queue updates remain pending.
+The live sandbox webhook expects an outer data object. Automatic Cashfree webhook delivery, the Indus in-call tool, and persistent borrower-queue updates remain pending.
 
 [Relay setup runbook](docs/relay-setup.md) · [Webhook contract](docs/webhook-contract.md) · [Sample requests](examples/relay-events.json)
 
