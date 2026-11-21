@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en-IN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#203e43">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'none'">
+  <title>Lender console | Cashfree × Sarvam</title>
+  <link rel="stylesheet" href="/lender/assets/style.css">
+  <script src="/lender/assets/app.js" defer></script>
+</head>
+<body>
+  <header class="mast">
+    <div class="wrap mast-inner">
+      <span class="brand"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true"><rect x="4" y="3" width="20" height="22" rx="3" stroke="currentColor" stroke-width="2"/><path d="M10 4v20m4-14h6m-6 5h6" stroke="currentColor" stroke-width="2"/></svg>Cashfree × Sarvam</span>
+      <span class="zone">IST (UTC+05:30)</span>
+    </div>
+  </header>
+  <main class="wrap">
+    <h1>Lender console</h1>
+    <p class="intro">Review who is due, check payments and schedule follow-ups.</p>
+    <noscript>This console needs JavaScript to load the queue.</noscript>
+
+    <div class="tools">
+      <form id="access" autocomplete="off" method="post">
+        <h2>Queue access</h2>
+        <label for="api-key">API key</label>
+        <div class="input-line">
+          <input id="api-key" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="key-hint" required>
+          <button class="primary" id="load" type="submit">Load queue</button>
+        </div>
+        <div class="hint-line"><span class="hint" id="key-hint">The key stays in this tab until you leave.</span><button type="button" class="text-button" id="forget" hidden>Clear key</button></div>
+      </form>
+      <form id="preview" method="post" enctype="multipart/form-data">
+        <h2>Notebook preview</h2>
+        <label for="notebook">Notebook file <span class="hint">(JPG, PNG or PDF)</span></label>
+        <div class="input-line">
+          <input id="notebook" type="file" accept="image/jpeg,image/png,application/pdf,.jpg,.jpeg,.png,.pdf" aria-describedby="file-hint" required>
+          <button id="preview-button" type="submit" disabled>Preview notebook</button>
+        </div>
+        <p class="hint" id="file-hint">Adds recognized installments to the queue without placing calls.</p>
+        <p class="notice" id="preview-note" role="status"></p>
+        <details id="preview-results" hidden><summary>Rows in this preview</summary><ul></ul></details>
+      </form>
+    </div>
+
+    <section id="queue" aria-labelledby="queue-title">
+      <div class="queue-head"><h2 id="queue-title" tabindex="-1">Installment queue</h2><p id="as-of">Queue not loaded.</p></div>
+      <p class="notice" id="queue-note" role="status"></p>
+      <section class="group" id="call-next" aria-labelledby="next-title">
+        <h3 id="next-title">Call next <span class="count">—</span></h3>
+        <p class="group-hint">Eligible installments, in priority order.</p>
+        <ol class="rows"></ol>
+      </section>
+      <section class="group" id="deferred" aria-labelledby="deferred-title">
+        <h3 id="deferred-title">On hold or deferred <span class="count">—</span></h3>
+        <p class="group-hint">Payment claims, callbacks and other reasons to wait.</p>
+        <ul class="rows"></ul>
+      </section>
+      <section class="group" id="paid" aria-labelledby="paid-title">
+        <h3 id="paid-title">Paid <span class="count">—</span></h3>
+        <p class="group-hint">Only payments confirmed by Cashfree appear here.</p>
+        <ul class="rows"></ul>
+      </section>
+    </section>
+  </main>
+
+  <template id="row-template">
+    <li class="installment">
+      <div class="row-main">
+        <div class="borrower"><span class="rank" hidden></span><h4></h4><p class="customer"></p></div>
+        <dl class="figures">
+          <div><dt>Due date</dt><dd class="due"></dd></div>
+          <div><dt>Outstanding</dt><dd class="balance"></dd></div>
+          <div><dt>Paid amount</dt><dd class="received"></dd></div>
+        </dl>
+      </div>
+      <p class="decision"><strong class="status"></strong><span class="reason"></span></p>
+      <p class="callback-time" hidden></p>
+      <details class="actions">
+        <summary>Manage installment</summary>
+        <div class="action-body">
+          <div class="payment-actions">
+            <button type="button" class="refresh">Refresh payment</button>
+            <button type="button" class="claim">Report already paid</button>
+          </div>
+          <p class="hint claim-hint">Reporting a borrower’s claim pauses outreach. It does not confirm payment.</p>
+          <form class="callback-form" method="post">
+            <label>Future callback time (IST, UTC+05:30)<input type="datetime-local" step="60" required></label>
+            <button type="submit">Schedule callback</button>
+            <p class="hint hours">Choose a time from 08:00 to before 19:00 IST.</p>
+          </form>
+          <p class="notice action-note" role="status"></p>
+        </div>
+      </details>
+    </li>
+  </template>
+</body>
+</html>

@@ -34,6 +34,10 @@ An Indus API tool can pass a request while the borrower is still on the call. If
 
 The checked-in examples are Relay test editor samples. They use the `data` envelope displayed in Relay's data selector. The borrower name and amount are synthetic, and the recipient value is a placeholder.
 
+For the local demo, the lender or a trusted server can send these outcomes to the trigger API with `X-API-Key`: `POST /queue/{installment_id}/already-paid` (no body) or `POST /queue/{installment_id}/callback` with `{"callback_at":"2027-01-05T11:00:00+05:30"}` (use a future date). A claim pauses calls but cannot mark an installment paid. These endpoints are not automatically subscribed to Relay events.
+
 ## Confirm checkout
 
 Cashfree emits `PAYMENT_LINK_EVENT` with `data.link_id`, `data.link_status`, and `data.link_amount_paid`. Verify the webhook signature where raw request bytes and headers are available, and fetch the link through the authenticated Cashfree connection before updating the tracked installment. Apply status updates idempotently. Treat partial payment as a remaining balance and confirmed full payment as a reason to remove the installment from the outreach queue. [Cashfree payment-link event schema](https://www.cashfree.com/docs/api-reference/payments/latest/payment-links/webhooks)
+
+In the lender console this reconciliation is manual: `POST /queue/{installment_id}/refresh` looks up the **stored** `emi-{installment_id}` link on the sandbox. The client cannot supply a link ID or change the paid amount. The API matches the link ID, original INR amount and phone, then records its cumulative verified payment in paise.

@@ -19,7 +19,7 @@ A sandbox prototype for collecting overdue installments through multilingual voi
 | Payment link | The route and native Create Payment Link action were configured with webhook field mappings. The sandbox connection was selected and the isolated node test succeeded. |
 | Payment status | The status lookup route and Fetch Payment Link Details action were configured with the webhook link ID. Cashfree checkout succeeded. A full Relay status run and a separate run with a sample payment event both fetched PAID and the full INR 1,200 from Cashfree. |
 
-The Relay agent is still a draft. Live webhook delivery, the Indus in-call tool, and persistent borrower-queue updates remain pending.
+The [lender queue](docs/lender-queue-demo.md) persists verified payment totals, reported-payment holds, and requested callbacks locally. Open `/lender` in the trigger API to review the queue and refresh an installment from the Cashfree sandbox. The Relay agent is still a draft; automatic live webhook delivery and the Indus in-call tool remain pending.
 
 [Relay setup runbook](docs/relay-setup.md) · [Webhook contract](docs/webhook-contract.md) · [Sample requests](examples/relay-events.json)
 

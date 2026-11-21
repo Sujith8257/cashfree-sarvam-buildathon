@@ -5,8 +5,8 @@ The lender photographs the loan notebook. Sarvam Document AI reads every row, an
 ## Run
 
 1. `pip install -r requirements.txt`
-2. In `.env`, set `CALL_API_URL` to the call API. Leave it empty to test with dry runs.
-3. `python trigger_api.py`, then open http://localhost:8000/docs
+2. In `.env`, set `SARVAM_API_KEY` for notebook OCR. Set `CALL_API_URL` only when you want to dispatch calls. Typed dry runs and the queue work without either key.
+3. `python trigger_api.py`, then open http://localhost:8000/lender for the queue or http://localhost:8000/docs for the API.
 4. The trigger key (`TRIGGER_API_KEY`) is created in `.env` on first start. Send it as the `X-API-Key` header (in `/docs`: **Authorize**).
 
 ```powershell
@@ -23,12 +23,18 @@ The notebook dry run above returns `call_queue`. Read it from rank 1: only `woul
 
 If no one can be called (including outside calling hours), `call_queue` is `[]`. Check `results` for every row in its original order and the reason it was included or skipped. A dry run does not place calls.
 
+Dry runs now also register valid installments in local SQLite. Open **[the lender console](http://localhost:8000/lender)** with `TRIGGER_API_KEY` to see the queue across uploads and restarts. **Refresh payment** uses the server's `CASHFREE_PG_CLIENT_ID` and `CASHFREE_PG_CLIENT_SECRET` to fetch the installment's own sandbox link. Reporting a payment only pauses contact; it never clears a balance. A scheduled callback becomes eligible again at its requested time, subject to the calling window and other holds. See the [demo walkthrough](../docs/lender-queue-demo.md).
+
 ## Endpoints
 
 | Method | Path | Input | What it does |
 |---|---|---|---|
 | POST | `/trigger/notebook` | form-data: `file` (JPG/PNG/PDF), optional `language` (e.g. `hi-IN`), `dry_run` | Reads the page and triggers a call for every borrower who is due |
 | POST | `/trigger/call` | JSON with the notebook fields, `?dry_run=true` optional | Triggers one call without a photo |
+| GET | `/queue` | `X-API-Key` | Ranked eligible installments and all other rows with reasons |
+| POST | `/queue/{installment_id}/refresh` | `X-API-Key`; no body | Reconcile the cumulative amount paid from Cashfree; partial payments reduce the remaining balance |
+| POST | `/queue/{installment_id}/already-paid` | `X-API-Key`; no body | Record a claim and hold outreach pending reconciliation |
+| POST | `/queue/{installment_id}/callback` | `X-API-Key`; JSON with offset-aware `callback_at` | Defer outreach to the requested time |
 
 Notebook fields read: `customer_id, name, phone_number, email, language, lending_date, due_date, outstanding_amount, principal_amount, interest_rate`
 
@@ -37,7 +43,8 @@ Notebook fields read: `customer_id, name, phone_number, email, language, lending
 - Calls only borrowers due tomorrow, today or overdue
 - Only between 8 AM and 7 PM IST (RBI); otherwise `blocked`
 - Unreadable phone, due date or amount: `needs_check`, no call
-- One call per borrower per due date per day
+- If an installment already on the queue is rescanned with a zero or credit balance, outreach is paused pending verification. The notebook itself never confirms a payment.
+- Duplicate calls for the same due date are suppressed within the current server process and day. Payment balances, claims, and callbacks persist across restarts.
 - `dry_run=true` shows who would be called, without calling
 
 ## What the call API receives

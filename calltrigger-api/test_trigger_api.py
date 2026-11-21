@@ -25,13 +25,15 @@ def row(**overrides):
 
 
 @pytest.fixture(autouse=True)
-def fresh_state():
+def fresh_state(tmp_path, monkeypatch):
     t.triggered.clear()
+    monkeypatch.setenv("COLLECTIONS_DB", str(tmp_path / "queue.sqlite3"))
 
 
 def test_phone_with_country_code_and_hindi_digits_is_read():
     assert t.parse_phone("+91 ९८७६५४३२१०") == "9876543210"
     assert t.parse_phone("98765") is None
+    assert t.parse_phone("wrong:0019876543210") is None
 
 
 def test_indian_date_formats_are_read():
@@ -67,6 +69,33 @@ def test_unreadable_phone_is_not_called():
 
 def test_nothing_outstanding_is_not_called():
     assert t.check_and_call(row(outstanding_amount=0), dry_run=True, now=NOON)["status"] == "skipped"
+
+
+def test_overpayment_is_not_registered_as_positive_debt():
+    assert t.check_and_call(row(outstanding_amount=-500), dry_run=True, now=NOON)["status"] == "skipped"
+
+
+def test_zero_balance_rescan_holds_existing_installment_without_verifying_payment():
+    t.check_and_call(row(), dry_run=True, now=NOON)
+    hold = t.check_and_call(row(outstanding_amount=0), dry_run=True, now=NOON)
+    assert hold["status"] == "payment_hold"
+    assert hold["paid_amount"] == 0
+    assert t.check_and_call(row(), dry_run=False, now=NOON)["status"] == "payment_hold"
+
+
+def test_preview_registers_installment_for_queue_even_outside_calling_hours(monkeypatch):
+    evening = NOON.replace(hour=20)
+    monkeypatch.setattr(t, "now_ist", lambda: evening, raising=False)
+    client = TestClient(t.app)
+    response = client.post("/trigger/call?dry_run=true", json=row(interest_rate=2),
+                           headers={"X-API-Key": "test-trigger-key"})
+    assert response.status_code == 200
+    installment = response.json()
+    assert installment["status"] == "blocked"
+    queue = client.get("/queue", headers={"X-API-Key": "test-trigger-key"})
+    assert queue.status_code == 200
+    assert queue.json()["call_queue"] == []
+    assert [r["installment_id"] for r in queue.json()["other"]] == [installment["installment_id"]]
 
 
 def test_notebook_preview_ranks_only_eligible_borrowers_by_due_date(monkeypatch):
