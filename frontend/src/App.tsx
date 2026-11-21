@@ -9,7 +9,6 @@ import { InteractionDetailModal } from '@/components/InteractionDetailModal'
 import { BulkImportModal } from '@/components/BulkImportModal'
 import { NewCustomerModal } from '@/components/NewCustomerModal'
 import { NewInteractionModal } from '@/components/NewInteractionModal'
-import { SupabaseSetupModal } from '@/components/SupabaseSetupModal'
 import { Button } from '@/components/ui/button'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { LayoutDashboard, Users, PhoneCall, RefreshCw, Sun, Moon, AlertCircle, Plus, Download, Upload, ChevronRight, Menu, X, Landmark, CalendarDays, Check } from 'lucide-react'
@@ -30,7 +29,6 @@ export function Dashboard({ onSignOut, accountName }: { onSignOut: () => void; a
   const [isNewCustomerOpen, setIsNewCustomerOpen] = useState(false)
   const [isNewInteractionOpen, setIsNewInteractionOpen] = useState(false)
   const [preselectedCustomerId, setPreselectedCustomerId] = useState<number | undefined>()
-  const [isSupabaseSetupOpen, setIsSupabaseSetupOpen] = useState(false)
   const [mobileNav, setMobileNav] = useState(false)
   const [notice, setNotice] = useState('')
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('theme') === 'dark')
@@ -96,10 +94,10 @@ export function Dashboard({ onSignOut, accountName }: { onSignOut: () => void; a
         </div>
       </aside>
       <div className="workspace-main">
-        <header className="topbar"><div className="breadcrumb"><button className="icon-button mobile-menu" onClick={() => setMobileNav(!mobileNav)} aria-label="Open navigation"><Menu size={20}/></button><span>Workspace</span><ChevronRight size={14}/><strong>{activeTab === 'overview' ? 'Overview' : activeTab === 'customers' ? 'Borrowers' : 'Interactions'}</strong></div><div className="topbar-actions"><button className={`connection-status ${live ? 'connected' : ''}`} onClick={() => setIsSupabaseSetupOpen(true)}><span/>{live ? 'Supabase connected' : 'Demo workspace'}</button><span className="topbar-divider"/><button className="icon-button" title="Refresh data" aria-label="Refresh data" disabled={loading} onClick={loadData}><RefreshCw size={18} className={loading ? 'animate-spin' : ''}/></button><button className="icon-button" title={isDarkMode ? 'Use light theme' : 'Use dark theme'} aria-label={isDarkMode ? 'Use light theme' : 'Use dark theme'} onClick={() => setIsDarkMode(!isDarkMode)}>{isDarkMode ? <Sun size={19}/> : <Moon size={19}/>}</button><div className="topbar-avatar" aria-label="Collections workspace">CW</div></div></header>
+        <header className="topbar"><div className="breadcrumb"><button className="icon-button mobile-menu" onClick={() => setMobileNav(!mobileNav)} aria-label="Open navigation"><Menu size={20}/></button><span>Workspace</span><ChevronRight size={14}/><strong>{activeTab === 'overview' ? 'Overview' : activeTab === 'customers' ? 'Borrowers' : 'Interactions'}</strong></div><div className="topbar-actions"><span className={`connection-status ${live ? 'connected' : ''}`}><span/>{live ? 'Supabase connected' : 'Demo workspace'}</span><span className="topbar-divider"/><button className="icon-button" title="Refresh data" aria-label="Refresh data" disabled={loading} onClick={loadData}><RefreshCw size={18} className={loading ? 'animate-spin' : ''}/></button><button className="icon-button" title={isDarkMode ? 'Use light theme' : 'Use dark theme'} aria-label={isDarkMode ? 'Use light theme' : 'Use dark theme'} onClick={() => setIsDarkMode(!isDarkMode)}>{isDarkMode ? <Sun size={19}/> : <Moon size={19}/>}</button><div className="topbar-avatar" aria-label="Collections workspace">CW</div></div></header>
         <main id="main-content" className="page-content">
           <section className="page-heading"><div><h1>{title}</h1><p>{activeTab === 'overview' ? 'A clear view of your portfolio. A better next step for every borrower.' : activeTab === 'customers' ? 'The people behind your portfolio, with every loan in one place.' : 'Every conversation, commitment, and follow-up in one place.'}</p></div><div className="heading-actions">{activeTab !== 'interactions' && <Button variant="outline" onClick={() => setIsBulkImportOpen(true)} disabled={loading}><Upload size={16}/>Upload CSV</Button>}<Button variant="outline" onClick={exportPortfolio} disabled={loading || customers.length === 0}><Download size={16}/>Export portfolio</Button><Button onClick={() => activeTab === 'interactions' ? newCall() : setIsNewCustomerOpen(true)} disabled={activeTab === 'interactions' && !customers.length}><Plus size={17}/>{activeTab === 'interactions' ? 'Log interaction' : 'Add borrower'}</Button></div></section>
-          {supabaseError && <div className="query-notice" role="alert"><AlertCircle size={19}/><div><strong>Could not load your portfolio</strong><p>{supabaseError}</p></div><button onClick={() => setIsSupabaseSetupOpen(true)}>Review connection</button></div>}
+          {supabaseError && <div className="query-notice" role="alert"><AlertCircle size={19}/><div><strong>Could not load your portfolio</strong><p>{supabaseError}</p></div><button onClick={loadData} disabled={loading}>Retry</button></div>}
           {loading ? <div className="workspace-loading" aria-label="Loading portfolio" role="status"><span className="sr-only">Loading portfolio</span><div className="skeleton summary-skeleton"/><div className="skeleton content-skeleton"/></div> : <>
             <MetricsOverview customers={customers} interactions={interactions}/>
             {activeTab === 'overview' && <section className="overview-grid">
@@ -116,7 +114,6 @@ export function Dashboard({ onSignOut, accountName }: { onSignOut: () => void; a
       {isBulkImportOpen && <BulkImportModal onClose={() => setIsBulkImportOpen(false)} onImport={async rows => { const saved = await importCustomers(rows); setCustomers(previous => [...previous, ...saved]); setNotice(rows.length + ' borrowers imported successfully') }}/>}
       {isNewCustomerOpen && <NewCustomerModal isOpen onClose={() => setIsNewCustomerOpen(false)} onSubmit={handleCreateCustomer}/>}
       {isNewInteractionOpen && <NewInteractionModal customers={customers} defaultCustomerId={preselectedCustomerId} isOpen onClose={() => setIsNewInteractionOpen(false)} onSubmit={handleCreateInteraction}/>}
-      <SupabaseSetupModal isOpen={isSupabaseSetupOpen} onClose={() => setIsSupabaseSetupOpen(false)} onSave={loadData}/>
     </div>
   )
 }

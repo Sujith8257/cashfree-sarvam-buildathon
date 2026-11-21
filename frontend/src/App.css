@@ -186,3 +186,10 @@ h1 { font-size:29px; line-height:1.25; font-weight:650; letter-spacing:-.8px; ma
 .auth-message { background:#edf8ef; color:#23613c; }
 .auth-loading { min-height:100vh; display:grid; place-items:center; }
 @media(max-width:760px) { .auth-page { grid-template-columns:1fr; } .auth-story { padding:28px; gap:30px; } .auth-story h1 { font-size:32px; } .auth-story > span,.auth-assurance { display:none; } .auth-story p { margin-bottom:0; } .auth-form-panel { padding:38px 24px; } }
+
+/* Shared welcome panel for login and signup. */
+.auth-story { gap:32px; }
+.auth-story-content { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding-bottom:64px; }
+.auth-story-content p { margin-left:auto; margin-right:auto; }
+.auth-story-content .auth-assurance { justify-content:center; }
+@media(max-width:760px) { .auth-story-content { padding-bottom:0; } }
