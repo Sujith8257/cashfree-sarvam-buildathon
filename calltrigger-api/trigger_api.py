@@ -1,4 +1,5 @@
 """Trigger API: photo of the lender's notebook -> Sarvam Document AI -> borrowers due -> call API."""
+import hashlib
 import json
 import os
 import re
@@ -6,6 +7,7 @@ import secrets
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import requests
 from dotenv import load_dotenv, set_key
@@ -29,7 +31,9 @@ CALL_START, CALL_END = 8, 19                  # RBI: contact borrowers only 8 AM
 REMIND_DAYS_BEFORE = 1                        # call if due tomorrow, today or overdue
 LANGS = {"hindi": "hi-IN", "english": "en-IN", "kannada": "kn-IN", "tamil": "ta-IN",
          "telugu": "te-IN", "marathi": "mr-IN", "bengali": "bn-IN", "gujarati": "gu-IN",
-         "malayalam": "ml-IN", "punjabi": "pa-IN", "odia": "od-IN"}
+         "malayalam": "ml-IN", "punjabi": "pa-IN", "odia": "od-IN", "assamese": "as-IN",
+         "sanskrit": "sa-IN"}
+RELAY_LANGUAGES = {code: name.title() for name, code in LANGS.items()}
 
 SCHEMA = {
     "type": "object",
@@ -113,6 +117,26 @@ def parse_number(value):
     return float(m.group().replace(",", "")) if m else None
 
 
+def relay_call_payload(customer):
+    """Translate the notebook API's customer record to the Relay call trigger contract."""
+    installment_ref = f"{customer['customer_id'] or customer['phone_number']}:{customer['due_date']}"
+    installment_id = hashlib.sha256(installment_ref.encode()).hexdigest()[:24]
+    return {
+        **customer,
+        "event": "start_collection_call",
+        "request_id": customer["trigger_id"],
+        "borrower_id": customer["customer_id"],
+        "installment_id": installment_id,
+        "borrower_name": customer["name"],
+        "phone": f"+91{customer['phone_number']}",
+        "preferred_language": RELAY_LANGUAGES.get(customer["language"], "Hindi"),
+        "amount_due": customer["outstanding_amount"],
+        "currency": "INR",
+        "days_past_due": customer["days_overdue"],
+        "link_id": f"emi-{installment_id}",
+    }
+
+
 def check_and_call(row, dry_run, now=None):
     """Apply the rules to one notebook row; trigger the call only if every rule passes."""
     now = now or datetime.now(IST)
@@ -166,8 +190,12 @@ def check_and_call(row, dry_run, now=None):
     if not CALL_API_URL:
         return {**payload, "status": "call_api_not_set", "reason": "set CALL_API_URL in .env"}
     headers = {"Authorization": f"Bearer {CALL_API_TOKEN}"} if CALL_API_TOKEN else {}
+    endpoint = urlsplit(CALL_API_URL)
+    is_relay = (endpoint.scheme == "https" and endpoint.hostname == "sandbox.cashfree.com"
+                and endpoint.path.startswith("/relay/inbound/webhook/"))
+    outbound = relay_call_payload(payload) if is_relay else payload
     try:
-        r = requests.post(CALL_API_URL, json=payload, headers=headers, timeout=15)
+        r = requests.post(CALL_API_URL, json=outbound, headers=headers, timeout=15)
     except requests.RequestException as e:
         return {**payload, "status": "call_api_error", "reason": str(e)}
     if not r.ok:

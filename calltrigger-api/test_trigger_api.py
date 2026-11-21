@@ -81,6 +81,27 @@ def test_same_borrower_is_called_once_per_day(monkeypatch):
     assert sent[0]["phone_number"] == "9876543210"
 
 
+def test_relay_webhook_receives_customer_fields_and_call_mapping(monkeypatch):
+    monkeypatch.setattr(t, "CALL_API_URL", "https://sandbox.cashfree.com/relay/inbound/webhook/example")
+    sent = []
+
+    class Ok:
+        ok = True
+
+    monkeypatch.setattr(t.requests, "post", lambda url, json, headers, timeout: sent.append(json) or Ok())
+    assert t.check_and_call(row(), dry_run=False, now=NOON)["status"] == "call_triggered"
+
+    payload = sent[0]
+    customer_fields = {key: payload[key] for key in row()}
+    assert customer_fields == {**row(), "language": "kn-IN", "interest_rate": 2.0}
+    assert payload["event"] == "start_collection_call"
+    assert payload["request_id"] == payload["trigger_id"]
+    assert payload["phone"] == "+919876543210"
+    assert payload["preferred_language"] == "Kannada"
+    assert payload["amount_due"] == 4500
+    assert payload["link_id"] == f"emi-{payload['installment_id']}"
+
+
 def test_wrong_api_key_is_rejected():
     client = TestClient(t.app)
     body = {"name": "Ramesh Kumar", "phone_number": "9876543210",

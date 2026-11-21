@@ -4,7 +4,22 @@ There are three event sources. The borrower dashboard or queue requests an outbo
 
 ## Start a call
 
-Set `event` to `start_collection_call`. Include a unique `request_id`, the borrower and installment IDs, and the synthetic profile fields shown in the example file. Use an E.164 test number and a language supported by the committed Indus agent. Resolve the starting language from the profile, and use the request ID to avoid duplicate calls.
+Submit a customer record to `POST /trigger/call` with the trigger API key. The notebook endpoint accepts the same fields after extraction.
+
+| Field | Format |
+| --- | --- |
+| `customer_id` | Customer reference |
+| `name` | Customer name |
+| `phone_number` | Indian mobile number |
+| `email` | Email address, or an empty string if unavailable |
+| `language` | Language name such as `Kannada`, or its locale code `kn-IN` |
+| `lending_date` | Loan origination date, preferably `YYYY-MM-DD` |
+| `due_date` | Payment due date, preferably `YYYY-MM-DD` |
+| `outstanding_amount` | Outstanding amount in INR |
+| `principal_amount` | Original principal in INR |
+| `interest_rate` | Percentage, such as `2` for 2% |
+
+When `CALL_API_URL` points to a Cashfree Relay sandbox inbound webhook, the trigger API forwards these fields and sets `event` to `start_collection_call`. It adds `request_id`, an installment reference derived from the customer and due date, and the fields used by the current Relay bindings, including E.164 `phone` and an Indus language name in `preferred_language`. The HTTP POST sends a plain JSON object. The Relay test editor uses the `data` envelope shown in the checked-in examples.
 
 ## Act on a borrower request
 

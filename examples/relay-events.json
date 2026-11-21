@@ -3,6 +3,16 @@
     "data": {
       "event": "start_collection_call",
       "request_id": "demo-call-001",
+      "customer_id": "DEMO-BORROWER",
+      "name": "Demo Borrower",
+      "phone_number": "<VERIFIED_TEST_RECIPIENT_LOCAL>",
+      "email": "borrower@example.test",
+      "language": "kn-IN",
+      "lending_date": "2026-08-18",
+      "due_date": "2026-11-18",
+      "outstanding_amount": 1200,
+      "principal_amount": 5000,
+      "interest_rate": 2,
       "borrower_id": "DEMO-BORROWER",
       "installment_id": "DEMO-INSTALLMENT",
       "borrower_name": "Demo Borrower",
@@ -10,7 +20,8 @@
       "preferred_language": "Kannada",
       "amount_due": 1200,
       "currency": "INR",
-      "days_past_due": 3
+      "days_past_due": 3,
+      "link_id": "demo-installment-link"
     }
   },
   {
