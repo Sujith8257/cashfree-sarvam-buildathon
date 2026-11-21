@@ -85,4 +85,4 @@ The queue uses the Relay call contract's installment ID, derived from customer I
 }
 ```
 
-`POST /queue/{installment_id}/refresh` reads the existing sandbox link and applies its verified **cumulative** paid amount. The client sends no payment data. A repeat cannot credit the same payment twice; a failed or mismatched lookup leaves the last verified balance intact. This feature creates no payment link and receives no automatic live payment webhook.
+`POST /queue/{installment_id}/refresh` reads the existing sandbox link and applies its verified **cumulative** paid amount. The client sends no payment data. A repeat cannot credit the same payment twice; a failed or mismatched lookup leaves the last verified balance intact. This manual demo creates no link or webhook subscription. The [sandbox Payment Link webhook](webhook-contract.md#confirm-checkout) can trigger the same reconciliation when Cashfree delivers a signed event.

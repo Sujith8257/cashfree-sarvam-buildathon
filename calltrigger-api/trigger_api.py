@@ -17,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import cashfree_status
+import cashfree_webhook
 import payment_store as store
 from review_notes import router as notes_router
 from queue_balance import installment_id, outreach_state, to_paise
@@ -70,6 +71,7 @@ SCHEMA = {
 }
 
 app = FastAPI(title="Loan call trigger")
+app.include_router(cashfree_webhook.router)
 triggered = set()  # shortcut: in-memory, forgets on restart; use a DB table before real use
 
 
