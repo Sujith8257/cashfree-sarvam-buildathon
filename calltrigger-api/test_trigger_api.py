@@ -26,7 +26,6 @@ def row(**overrides):
 
 @pytest.fixture(autouse=True)
 def fresh_state(tmp_path, monkeypatch):
-    t.triggered.clear()
     monkeypatch.setenv("COLLECTIONS_DB", str(tmp_path / "queue.sqlite3"))
 
 
@@ -129,9 +128,9 @@ def test_same_borrower_is_called_once_per_day(monkeypatch):
     sent = []
 
     class Ok:
-        ok = True
+        status_code = 200
 
-    monkeypatch.setattr(t.requests, "post", lambda url, json, headers, timeout: sent.append(json) or Ok())
+    monkeypatch.setattr(t.requests, "post", lambda url, json, **kwargs: sent.append(json) or Ok())
     assert t.check_and_call(row(), dry_run=False, now=NOON)["status"] == "call_triggered"
     assert t.check_and_call(row(), dry_run=False, now=NOON)["status"] == "skipped"
     assert len(sent) == 1
@@ -143,9 +142,9 @@ def test_relay_webhook_receives_customer_fields_and_call_mapping(monkeypatch):
     sent = []
 
     class Ok:
-        ok = True
+        status_code = 200
 
-    monkeypatch.setattr(t.requests, "post", lambda url, json, headers, timeout: sent.append(json) or Ok())
+    monkeypatch.setattr(t.requests, "post", lambda url, json, **kwargs: sent.append(json) or Ok())
     assert t.check_and_call(row(), dry_run=False, now=NOON)["status"] == "call_triggered"
 
     assert set(sent[0]) == {"data"}

@@ -44,12 +44,12 @@ Notebook fields read: `customer_id, name, phone_number, email, language, lending
 - Only between 8 AM and 7 PM IST (RBI); otherwise `blocked`
 - Unreadable phone, due date or amount: `needs_check`, no call
 - If an installment already on the queue is rescanned with a zero or credit balance, outreach is paused pending verification. The notebook itself never confirms a payment.
-- Duplicate calls for the same due date are suppressed within the current server process and day. Payment balances, claims, and callbacks persist across restarts.
+- Each installment gets at most one accepted or uncertain reminder per IST day. All workers must share the same persistent SQLite file (`COLLECTIONS_DB`). A timeout after a possible send, ambiguous HTTP response, or worker crash leaves the slot reserved: check the provider or Relay logs using the `trigger_id`; do not resend that day. A definite rejection releases the slot for a corrected retry.
 - `dry_run=true` shows who would be called, without calling
 
 ## What the call API receives
 
-`POST CALL_API_URL` with this JSON (`Authorization: Bearer CALL_API_TOKEN` if set). Any 2xx means the call started. Ignore a `trigger_id` you have already seen: it's a retry, not a new call.
+`POST CALL_API_URL` with this JSON (`Authorization: Bearer CALL_API_TOKEN` if set); the [Relay webhook](../docs/webhook-contract.md#start-a-call) uses its `data` envelope. A 2xx keeps the `call_triggered` response status. `dispatch_state` is `queued` for Relay acknowledgments or HTTP 202, `accepted` for other direct 2xx responses, and `unknown` if acceptance cannot be established. None confirms the borrower was reached. Receivers should ignore a `trigger_id` they have already seen.
 
 ```json
 {

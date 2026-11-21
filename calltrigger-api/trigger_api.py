@@ -17,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import cashfree_status
+import dispatch_ledger
 import payment_store as store
 from queue_balance import installment_id, outreach_state, to_paise
 
@@ -67,7 +68,6 @@ SCHEMA = {
 }
 
 app = FastAPI(title="Loan call trigger")
-triggered = set()  # shortcut: in-memory, forgets on restart; use a DB table before real use
 
 
 def require_key(key: str = Security(APIKeyHeader(name="X-API-Key"))):
@@ -151,7 +151,7 @@ def daily_trigger_id(record, today):
     return f"{record['customer_id'] or record['phone_number']}-{record['due_date']}-{today}"
 
 
-def queue_entry(record, now):
+def queue_entry(record, now, dispatches=None):
     """Use the same current balance, holds and contact rules for display and dispatch."""
     today = now.date()
     days = (today - datetime.fromisoformat(record["due_date"]).date()).days
@@ -161,22 +161,28 @@ def queue_entry(record, now):
             status, reason = "not_due", f"due on {record['due_date']}, too early to call"
         elif not CALL_START <= now.hour < CALL_END:
             status, reason = "blocked", "outside 8 AM-7 PM calling hours"
-        elif daily_trigger_id(record, today) in triggered:
-            status, reason = "skipped", "already called today for this due date"
         else:
             due_reason = (f"{days} day(s) overdue" if days > 0 else
                           "due today" if days == 0 else f"due in {-days} day(s), reminder")
             status, reason = "would_call", f"{reason}; {due_reason}" if reason else due_reason
-    return {"installment_id": record["installment_id"], "customer_id": record["customer_id"],
-            "name": record["name"], "due_date": record["due_date"], "days_overdue": max(0, days),
-            "outstanding_amount": (record["amount_paise"] - record["paid_paise"]) / 100,
-            "paid_amount": record["paid_paise"] / 100, "callback_at": record["callback_at"],
-            "status": status, "reason": reason}
+    entry = {"installment_id": record["installment_id"], "customer_id": record["customer_id"],
+             "name": record["name"], "due_date": record["due_date"], "days_overdue": max(0, days),
+             "outstanding_amount": (record["amount_paise"] - record["paid_paise"]) / 100,
+             "paid_amount": record["paid_paise"] / 100, "callback_at": record["callback_at"],
+             "status": status, "reason": reason}
+    iid = record["installment_id"]
+    state = dispatches.get(iid) if dispatches is not None else dispatch_ledger.state((iid, today.isoformat()))
+    if state is not None:
+        delivery = dispatch_ledger.outcome(daily_trigger_id(record, today), state)
+        if status != "would_call":  # Show the dispatch evidence without masking a payment, callback or hours hold.
+            delivery.update(status=status, reason=f"{reason} {delivery['reason']}")
+        entry.update(delivery)
+    return entry
 
 
 def check_and_call(row, dry_run, now=None):
     """Register valid notebook rows even when outreach is deferred. Only dispatch eligible rows."""
-    now = now or now_ist()
+    now = (now or now_ist()).astimezone(IST)
     customer_id = str(row.get("customer_id") or "").strip()
     name = str(row.get("name") or "").strip() or "Unknown"
     phone = parse_phone(row.get("phone_number"))
@@ -239,14 +245,9 @@ def check_and_call(row, dry_run, now=None):
     is_relay = (endpoint.scheme == "https" and endpoint.hostname == "sandbox.cashfree.com"
                 and endpoint.path.startswith("/relay/inbound/webhook/"))
     outbound = {"data": relay_call_payload(payload)} if is_relay else payload
-    try:
-        r = requests.post(CALL_API_URL, json=outbound, headers=headers, timeout=15)
-    except requests.RequestException as e:
-        return {**payload, "status": "call_api_error", "reason": str(e)}
-    if not r.ok:
-        return {**payload, "status": "call_api_error", "reason": f"{r.status_code} {r.text[:200]}"}
-    triggered.add(trigger_id)
-    return {**payload, "status": "call_triggered"}
+    result = dispatch_ledger.post_once((iid, now.date().isoformat()), trigger_id, CALL_API_URL, outbound, headers,
+                                       relay=is_relay)
+    return {**payload, **result}
 
 
 def ranked_queue(results):
@@ -303,7 +304,8 @@ def get_installment(iid):
 def lender_queue():
     """Evaluate the stored installments at read time, including callbacks that just became due."""
     now = now_ist()
-    rows = [queue_entry(record, now) for record in store.all_installments()]
+    dispatches = dispatch_ledger.states_for_day(now.date().isoformat())
+    rows = [queue_entry(record, now, dispatches) for record in store.all_installments()]
     return {"as_of": now.isoformat(), "call_queue": ranked_queue(rows),
             "other": [r for r in rows if r["status"] != "would_call"]}
 
