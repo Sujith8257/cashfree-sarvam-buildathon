@@ -10,7 +10,7 @@ from urllib.parse import urlsplit
 
 import requests
 from dotenv import load_dotenv, set_key
-from fastapi import APIRouter, Depends, FastAPI, File, Form, HTTPException, Security, UploadFile
+from fastapi import APIRouter, Depends, FastAPI, File, Form, HTTPException, Query, Security, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.security import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
@@ -312,8 +312,10 @@ def ranked_queue(results):
 
 
 @app.post("/trigger/notebook", dependencies=[Depends(require_key)])
-def trigger_from_notebook(file: UploadFile = File(...), language: str = Form(""), dry_run: bool = Form(False)):
-    """Upload a notebook page. With dry_run=true, preview whom to call first by earliest due date."""
+def trigger_from_notebook(file: UploadFile = File(...), language: str = Form(""), dry_run: bool = Form(False),
+                          max_calls: int | None = Query(None, ge=1)):
+    """Upload a notebook page. Borrowers are called earliest due date first, at most max_calls per live run.
+    With dry_run=true, preview that order without calling."""
     media_type = NOTEBOOK_TYPES.get(Path(file.filename or "").suffix.lower())
     if not media_type or file.content_type not in (None, "application/octet-stream", media_type):
         raise HTTPException(415, "Choose a JPG, PNG or PDF notebook.")
@@ -323,7 +325,18 @@ def trigger_from_notebook(file: UploadFile = File(...), language: str = Form("")
     if not data:
         raise HTTPException(422, "The notebook is empty. Choose a page to preview.")
     rows = read_notebook(data, file.filename, media_type, language)
-    results = [check_and_call(row, dry_run) for row in rows]
+    results = [check_and_call(row, True) for row in rows]  # Register and rank every row before any call.
+    if not dry_run:
+        spent = 0
+        for ranked in ranked_queue([{**r, "notebook_row": i} for i, r in enumerate(results)]):
+            i = ranked["notebook_row"]
+            if max_calls is not None and spent >= max_calls:
+                results[i] = {**results[i], "status": "skipped", "reason": f"call budget of {max_calls} reached"}
+                continue
+            results[i] = check_and_call(rows[i], False)  # Rechecks eligibility inside the ledger reservation.
+            # A rejected request placed no call; an unknown outcome may have.
+            spent += (results[i]["status"] in ("call_triggered", "call_api_error")
+                      and results[i].get("dispatch_state") != "rejected")
     response = {"rows_read": len(rows),
                 "calls": sum(r["status"] in ("call_triggered", "would_call") for r in results),
                 "results": results,
