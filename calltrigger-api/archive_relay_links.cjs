@@ -6,6 +6,9 @@ const supabase = new URL(process.env.SUPABASE_URL);
 const apiKey = process.env.SUPABASE_SECRET_KEY;
 const agents = (process.env.RELAY_SANDBOX_AGENT_IDS || '').split(',');
 const watch = process.argv.includes('--watch');
+const callsOnly = process.argv.includes('--calls-only');
+const calls = callsOnly || process.argv.includes('--with-calls')
+  ? require('./archive_relay_calls.cjs').archiveCalls(supabase, apiKey) : null;
 const completedRuns = new Set();
 
 if (supabase.protocol !== 'https:' || !supabase.hostname.endsWith('.supabase.co') ||
@@ -87,7 +90,7 @@ async function archiveLink(link) {
 async function sync(request, headers) {
   let saved = 0;
   let verified = 0;
-  const since = Date.now() - 60 * 60 * 1000;
+  const since = Date.now() - (calls ? 6 : 1) * 60 * 60 * 1000;
   for (const agent of agents) {
     const list = await getRelay(request, headers, `/execution-records/agent/${agent}`);
     if (!Array.isArray(list.items)) throw new Error('Unexpected Relay run list');
@@ -99,6 +102,8 @@ async function sync(request, headers) {
       const detail = await getRelay(request, headers, `/execution-records/${run.executionId}/nodes`);
       if (String(detail.workflowId) !== agent) throw new Error('Unexpected Relay workflow ID');
       for (const node of Object.values(detail.nodeWiseExecutionData || {})) {
+        calls?.track(node, run.startedAt);
+        if (callsOnly) continue;
         const link = node.output?.data;
         if (node.status === 'COMPLETED' && node.output?.success === true &&
             typeof node.input?.linkAmount === 'number' && link?.link_id && link?.link_url) {
@@ -124,11 +129,12 @@ async function main() {
       try {
         headers ||= await relaySession(context);
         const result = await sync(context.request, headers);
-        if (result.verified || !watch) console.log(JSON.stringify(result));
+        if (calls) result.calls = await calls.sync();
+        if (result.verified || result.calls?.verified || !watch) console.log(JSON.stringify(result));
       } catch (error) {
         if (!watch) throw error;
         headers = undefined;
-        console.error(`Retrying payment-link archive after ${error.name}`);
+        console.error(`Retrying Relay archive after ${error.message}`);
       }
       if (watch) await delay(20_000);
     } while (watch && browser.isConnected());
@@ -138,6 +144,6 @@ async function main() {
 }
 
 main().catch(error => {
-  console.error(`Payment-link archive stopped: ${error.message}`);
+  console.error(`Relay archive stopped: ${error.message}`);
   process.exitCode = 1;
 });

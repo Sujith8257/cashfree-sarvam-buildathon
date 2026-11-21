@@ -2,6 +2,8 @@
 
 Use synthetic loan records, Cashfree **Test** mode, and only a consenting test phone. To run without calls or credentials, use the isolated [local walkthrough](lender-queue-demo.md) and replay the automated cases below. For a live payment, arrange the matching sandbox link and PG credentials first.
 
+**Fastest offline rehearsal:** from the repository root run `python -m evaluation.rehearsal`. It drives the real FastAPI, signature verification, SQLite and ranking rules using a temporary database, synthetic clock and simulated provider HTTP responses. It prints the changing balance and queue; it never dials, charges or contacts a provider. Label this as a rehearsal when showing it.
+
 | Time | What to show | Evidence to point at |
 |---|---|---|
 | 0:00–0:25 | Open `/lender`, preview a notebook and expand **Rows in this preview**. | Only eligible rows enter **Call next**. Every skipped row has a reason. A failed or incomplete scan doesn't start any calls. |

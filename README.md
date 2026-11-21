@@ -18,9 +18,9 @@ A sandbox prototype for collecting overdue installments through multilingual voi
 | Indus call | A live Relay webhook launched a connected Indus v4 call. A separate Kannada test verified profile-based language selection. |
 | Payment link and email | A direct `create_payment_link` webhook produced an active sandbox checkout with email enabled. The test recipient confirmed receipt. Cashfree sends payment-link SMS in production only. |
 | Payment status | A prior sandbox checkout completed and the Relay status route fetched `PAID`. A sample payment event also ran through the lookup branch. |
-| Supabase | The local archive watcher picked up a newly generated link and saved it to private Storage. One demo call's transcript, metadata, and WAV were also saved and read back successfully. |
+| Supabase | The local watcher saves generated payment links and completed Relay calls to private Storage. The v4 call's transcript, summary, and WAV were read back successfully. |
 
-The demo uses the inbound webhook for Relay sandbox agent `43703` and expects an outer `data` object. The direct payment-link event is the verified demo path. The Indus in-call tool still needs to send the expected request body to this endpoint. Automatic call archiving to Supabase remains pending.
+The demo uses the inbound webhook for Relay sandbox agent `43703` and expects an outer `data` object. The direct payment-link event is the verified demo path. The Indus in-call tool still needs to send the expected request body to this endpoint.
 
 The [lender queue](docs/lender-queue-demo.md) persists confirmed payments, claims, callbacks, promises, and contact stops in SQLite. It can reconcile from **Refresh payment** or a [signed Cashfree payment-link event](docs/webhook-contract.md#confirm-checkout). The local receiver has been exercised with signed fixtures. A Cashfree-originated event to the deployed receiver still needs a live check.
 
