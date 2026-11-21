@@ -31,6 +31,8 @@ CALL_API_URL = os.getenv("CALL_API_URL")      # your friend's "start a call" end
 CALL_API_TOKEN = os.getenv("CALL_API_TOKEN")  # optional, sent as a Bearer token
 
 SARVAM_JOB = "https://api.sarvam.ai/doc-ai/v1/job"
+MAX_NOTEBOOK_BYTES = 10 * 1024 * 1024
+NOTEBOOK_TYPES = {".pdf": "application/pdf", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png"}
 IST = timezone(timedelta(hours=5, minutes=30))
 CALL_START, CALL_END = 8, 19                  # RBI: contact borrowers only 8 AM-7 PM
 REMIND_DAYS_BEFORE = 1                        # call if due tomorrow, today or overdue
@@ -75,28 +77,60 @@ def require_key(key: str = Security(APIKeyHeader(name="X-API-Key"))):
         raise HTTPException(401, "Invalid API key")
 
 
+def ocr_request(method, path, deadline, **kwargs):
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise HTTPException(504, "OCR timed out. Try a smaller batch of pages.")
+    try:
+        response = requests.request(method, f"{SARVAM_JOB}/{path}", headers={"api-subscription-key": SARVAM_KEY},
+                                    timeout=min(30, remaining), allow_redirects=False, **kwargs)
+    except requests.Timeout:
+        raise HTTPException(504, "OCR timed out. Try a smaller batch of pages.") from None
+    except requests.RequestException:
+        raise HTTPException(502, "Sarvam OCR is unreachable. Try again later.") from None
+    if response.status_code in (401, 402, 403):
+        raise HTTPException(503, "Notebook OCR is unavailable; check the server's Sarvam key and credits.")
+    if response.status_code == 429:
+        raise HTTPException(503, "OCR is busy. Try again later.")
+    if method == "POST" and response.status_code in (400, 413, 422):
+        raise HTTPException(422, "OCR could not read the upload. Try a smaller, clearer JPG, PNG or PDF.")
+    if not 200 <= response.status_code < 300:
+        raise HTTPException(502, "Sarvam OCR could not complete this request.")
+    try:
+        body = response.json()
+    except ValueError:
+        body = None
+    if not isinstance(body, dict):
+        raise HTTPException(502, "Unexpected OCR response. No rows were processed.")
+    return body
+
+
 def read_notebook(data, filename, content_type, language):
-    """Send the notebook page to Sarvam Document AI (Extract) and wait for the borrower rows."""
+    """Only a complete Extract job with a well-formed batch can reach dispatch."""
     if not SARVAM_KEY:
         raise HTTPException(503, "Notebook OCR requires SARVAM_API_KEY")
-    headers = {"api-subscription-key": SARVAM_KEY}
     form = {"schema": json.dumps(SCHEMA), "output_format": "json"}
     if language:
         form["language"] = language
-    r = requests.post(f"{SARVAM_JOB}/extract", headers=headers, data=form,
-                      files={"file": (filename, data, content_type)}, timeout=60)
-    if not r.ok:
-        raise HTTPException(502, f"Sarvam rejected the upload: {r.status_code} {r.text[:300]}")
-    job_id = r.json()["job_id"]
-    for _ in range(90):  # up to ~3 minutes
-        status = requests.get(f"{SARVAM_JOB}/{job_id}/status", headers=headers, timeout=30).json()["status"].lower()
-        if status in ("completed", "partially_completed"):
-            result = requests.get(f"{SARVAM_JOB}/{job_id}/results", headers=headers, timeout=30).json()["result"]
-            return result.get("borrowers") or []
-        if status in ("failed", "rejected"):
-            raise HTTPException(502, f"Sarvam job {job_id} {status}")
+    deadline = time.monotonic() + 180
+    job = ocr_request("POST", "extract", deadline, data=form, files={"file": (filename, data, content_type)})
+    job_id = job.get("job_id")
+    if not isinstance(job_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", job_id):
+        raise HTTPException(502, "OCR did not return a valid job reference.")
+    while True:
+        status = ocr_request("GET", f"{job_id}/status", deadline).get("status")
+        if status == "completed":
+            break
+        if status in ("partially_completed", "failed", "rejected"):
+            raise HTTPException(422, "OCR could not read every page. Rescan or split the notebook; no calls were started.")
+        if status not in ("running", "pending"):
+            raise HTTPException(502, "Unexpected OCR job status. No rows were processed.")
         time.sleep(2)
-    raise HTTPException(504, f"Sarvam job {job_id} is still running, try again")
+    result = ocr_request("GET", f"{job_id}/results", deadline).get("result")
+    rows = result.get("borrowers") if isinstance(result, dict) else None
+    if not isinstance(rows, list) or not all(isinstance(row, dict) for row in rows):
+        raise HTTPException(502, "OCR returned an unreadable borrower list. No rows were processed.")
+    return rows
 
 
 def ascii_digits(text):
@@ -258,7 +292,15 @@ def ranked_queue(results):
 @app.post("/trigger/notebook", dependencies=[Depends(require_key)])
 def trigger_from_notebook(file: UploadFile = File(...), language: str = Form(""), dry_run: bool = Form(False)):
     """Upload a notebook page. With dry_run=true, preview whom to call first by earliest due date."""
-    rows = read_notebook(file.file.read(), file.filename, file.content_type, language)
+    media_type = NOTEBOOK_TYPES.get(Path(file.filename or "").suffix.lower())
+    if not media_type or file.content_type not in (None, "application/octet-stream", media_type):
+        raise HTTPException(415, "Choose a JPG, PNG or PDF notebook.")
+    data = file.file.read(MAX_NOTEBOOK_BYTES + 1)
+    if len(data) > MAX_NOTEBOOK_BYTES:
+        raise HTTPException(413, "Notebook exceeds the 10 MiB limit. Upload fewer pages at once.")
+    if not data:
+        raise HTTPException(422, "The notebook is empty. Choose a page to preview.")
+    rows = read_notebook(data, file.filename, media_type, language)
     results = [check_and_call(row, dry_run) for row in rows]
     response = {"rows_read": len(rows),
                 "calls": sum(r["status"] in ("call_triggered", "would_call") for r in results),

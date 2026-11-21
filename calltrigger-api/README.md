@@ -38,6 +38,8 @@ Dry runs now also register valid installments in local SQLite. Open **[the lende
 
 Notebook fields read: `customer_id, name, phone_number, email, language, lending_date, due_date, outstanding_amount, principal_amount, interest_rate`
 
+Upload JPG, PNG or PDF files up to 10 MiB. If Sarvam reads only part of a batch or returns a malformed list, the API stops **before registering or calling anyone from that upload**. Rescan or split the pages and preview again. A temporarily busy provider returns `503`; a timeout returns `504`. These responses do not include raw provider data.
+
 ## Rules
 
 - Calls only borrowers due tomorrow, today or overdue
