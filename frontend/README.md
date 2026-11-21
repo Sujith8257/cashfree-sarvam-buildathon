@@ -64,7 +64,10 @@ npm run build
 3. Set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` in `.env`, then restart Vite or rebuild for deployment. Existing installations can also use `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. A connection saved through the setup dialog takes precedence on that browser.
 4. Open #/signup to create an account. If email confirmation is enabled, confirm your email before signing in at #/login.
 
-Optional: set `VITE_LENDER_CONSOLE_URL` in `.env` to an http(s) URL such as `http://127.0.0.1:8000/lender` to show an **Open call queue** link to the lender console on the overview; leave it unset to hide the link.
+Call queue (local demo only):
+1. In `calltrigger-api`, start the collections API: `python -m uvicorn trigger_api:app --host 127.0.0.1 --port 8000`.
+2. Give Vite the same `TRIGGER_API_KEY` (and `COLLECTIONS_API_URL` if the API runs elsewhere) in `frontend/.env` or the shell, then `npm run dev`.
+3. The overview shows the call queue, and borrowers added or imported with a due date and open balance join it. The Vite dev/preview proxy forwards only `GET /api/queue` and `POST /api/trigger/call`, always with `dry_run=true`, so the dashboard never starts a call; the key stays on the Vite server.
 
 Supabase Auth stores and verifies passwords. The SQL creates a profile automatically and applies row level security so each account can access its own borrowers and interactions. Existing records with a NULL user_id remain hidden until assigned explicitly to their owner's auth.users.id. Amounts are displayed as INR (₹) with Indian digit grouping; existing numeric values are not converted from another currency.
 
