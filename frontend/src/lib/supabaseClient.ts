@@ -202,3 +202,20 @@ export async function addCustomer(customer: Omit<Customer, 'customer_id'>): Prom
 }
 
 
+
+// One insert keeps a CSV batch atomic; never fall back to local data after a live failure.
+export async function importCustomers(customers: Omit<Customer, 'customer_id'>[]): Promise<Customer[]> {
+  if (!customers.length || customers.length > 1000) throw new Error('Import between 1 and 1,000 borrowers.')
+  const client = getSupabaseClient()
+  if (client) {
+    const { data, error } = await client.from('customers').insert(customers).select()
+    if (error) throw new Error(error.message)
+    return (data || []) as Customer[]
+  }
+  if (getStoredSupabaseConfig().hasCredentials) throw new Error('Could not connect to Supabase. Check your connection and retry.')
+  const existing = getLocalCustomers()
+  const firstId = existing.length ? Math.max(...existing.map(customer => customer.customer_id)) + 1 : 101
+  const records = customers.map((customer, index) => ({ ...customer, customer_id: firstId + index }))
+  saveLocalCustomers([...existing, ...records])
+  return records
+}

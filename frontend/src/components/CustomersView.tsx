@@ -6,7 +6,7 @@ import { Card, CardContent } from './ui/card'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import {
   Search,
-  UserPlus,
+  UserPlus, Upload,
   PhoneCall,
   LayoutGrid,
   List,
@@ -22,6 +22,7 @@ interface CustomersViewProps {
   customers: Customer[]
   interactions: AgentInteraction[]
   onSelectCustomer: (customer: Customer) => void
+  onImportCsv: () => void
   onNewCustomer: () => void
   onNewCall: (customerId: number) => void
 }
@@ -30,7 +31,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
   customers,
   interactions,
   onSelectCustomer,
-  onNewCustomer,
+  onNewCustomer, onImportCsv,
   onNewCall,
 }) => {
   const [search, setSearch] = useState('')
@@ -137,7 +138,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
         </div>
 
         {/* View toggle & Add button */}
-        <div className="flex items-center gap-2 self-end md:self-center">
+        <div className="flex flex-wrap items-center gap-2 self-end md:self-center">
           <div className="flex items-center border border-slate-200 dark:border-slate-800 rounded-lg p-0.5">
             <Button
               variant={viewMode === 'table' ? 'secondary' : 'ghost'}
@@ -159,6 +160,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
             </Button>
           </div>
 
+          <Button size="sm" variant="outline" onClick={onImportCsv} className="gap-1.5 text-xs"><Upload className="h-4 w-4" />Upload CSV</Button>
           <Button size="sm" onClick={onNewCustomer} className="gap-1.5 text-xs">
             <UserPlus className="h-4 w-4" />
             Add borrower
