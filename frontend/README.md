@@ -64,6 +64,8 @@ npm run build
 3. Set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` in `.env`, then restart Vite or rebuild for deployment. Existing installations can also use `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. A connection saved through the setup dialog takes precedence on that browser.
 4. Open #/signup to create an account. If email confirmation is enabled, confirm your email before signing in at #/login.
 
+Optional: set `VITE_LENDER_CONSOLE_URL` in `.env` to an http(s) URL such as `http://127.0.0.1:8000/lender` to show an **Open call queue** link to the lender console on the overview; leave it unset to hide the link.
+
 Supabase Auth stores and verifies passwords. The SQL creates a profile automatically and applies row level security so each account can access its own borrowers and interactions. Existing records with a NULL user_id remain hidden until assigned explicitly to their owner's auth.users.id. Amounts are displayed as INR (₹) with Indian digit grouping; existing numeric values are not converted from another currency.
 
 Live authentication requires a configured Supabase project. The dashboard requires an authenticated session; failed live writes return an error instead of saving locally.

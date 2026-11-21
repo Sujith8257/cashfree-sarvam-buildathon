@@ -26,6 +26,8 @@ export function formatDate(dateString: string | null | undefined): string {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
+      // Date-only values parse as UTC midnight; format them in UTC so every viewer sees the same day.
+      timeZone: /^\d{4}-\d{2}-\d{2}$/.test(dateString) ? 'UTC' : undefined,
     })
   } catch {
     return String(dateString)
