@@ -1,9 +1,10 @@
+import { LanguageSelect } from './LanguageSelect'
 import { DialogFrame } from './ui/DialogFrame'
 import React, { useState } from 'react'
 import { Customer } from '@/types/database'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
-import { X, UserPlus, Save } from 'lucide-react'
+import { X, UserPlus, Save, ReceiptText, Upload, FileText, ArrowRight } from 'lucide-react'
 
 interface NewCustomerModalProps {
   isOpen: boolean
@@ -17,7 +18,7 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
   onSubmit,
 }) => {
   const [name, setName] = useState('')
-  const [phone, setPhone] = useState('')
+  const [phone, setPhone] = useState('+91 ')
   const [email, setEmail] = useState('')
   const [language, setLanguage] = useState('English')
   const [lendingDate, setLendingDate] = useState(new Date().toISOString().slice(0, 10))
@@ -27,6 +28,24 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
   const [interestRate, setInterestRate] = useState('12.5')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [entryMethod, setEntryMethod] = useState<'manual' | 'receipt'>('manual')
+  const [receipt, setReceipt] = useState<File | null>(null)
+  const [receiptError, setReceiptError] = useState('')
+  const [isDragging, setIsDragging] = useState(false)
+
+  const selectReceipt = (file?: File) => {
+    if (!file) return
+    if (!['image/jpeg', 'image/png', 'application/pdf'].includes(file.type)) {
+      setReceiptError('Choose a JPG, PNG, or PDF receipt.')
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setReceiptError('Choose a receipt smaller than 10 MB.')
+      return
+    }
+    setReceipt(file)
+    setReceiptError('')
+  }
 
   if (!isOpen) return null
 
@@ -37,6 +56,7 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
     try {
       if (!name.trim() || !phone.trim()) throw new Error('Enter the borrower’s name and phone number.')
       if (dueDate && lendingDate && dueDate < lendingDate) throw new Error('Due date must be on or after the lending date.')
+      if (!/^\+91[6-9]\d{9}$/.test(phone.replace(/\s/g, ''))) throw new Error('Enter a valid 10-digit Indian mobile number with +91.')
       const principal = parseFloat(principalAmount) || 0
       const outstanding = outstandingAmount ? parseFloat(outstandingAmount) : principal
 
@@ -80,7 +100,43 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
           </Button>
         </div>
 
-        {/* Form Body */}
+        <div className="grid grid-cols-2 gap-2 px-6 pt-5" aria-label="Borrower entry method">
+          <Button variant={entryMethod === 'manual' ? 'default' : 'outline'} onClick={() => setEntryMethod('manual')} aria-pressed={entryMethod === 'manual'} className="gap-2">
+            <UserPlus size={16} />Enter manually
+          </Button>
+          <Button variant={entryMethod === 'receipt' ? 'default' : 'outline'} onClick={() => setEntryMethod('receipt')} aria-pressed={entryMethod === 'receipt'} className="gap-2">
+            <ReceiptText size={16} />Upload receipt
+          </Button>
+        </div>
+
+        {entryMethod === 'receipt' ? <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Start with a receipt</h3>
+            <p className="mt-1 text-xs leading-5 text-slate-500">Choose a loan receipt to use as a reference for borrower and loan details.</p>
+          </div>
+          <label
+            className={`relative flex min-h-44 cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-6 text-center transition-colors focus-within:ring-2 focus-within:ring-blue-500 ${isDragging ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30' : 'border-slate-200 bg-slate-50 hover:border-blue-400 dark:border-slate-700 dark:bg-slate-950/40'}`}
+            onDragOver={event => { event.preventDefault(); setIsDragging(true) }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={event => { event.preventDefault(); setIsDragging(false); selectReceipt(event.dataTransfer.files[0]) }}
+          >
+            <input type="file" accept=".jpg,.jpeg,.png,.pdf" className="sr-only" aria-label="Choose receipt" onChange={event => { selectReceipt(event.target.files?.[0]); event.target.value = '' }} />
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-400"><Upload size={22} /></span>
+            <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Click to upload or drag and drop</span>
+            <span className="text-xs text-slate-500">JPG, PNG or PDF · Up to 10 MB</span>
+          </label>
+          {receiptError && <p className="form-error" role="alert">{receiptError}</p>}
+          {receipt && <div className="flex items-center gap-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700" role="status">
+            <FileText size={22} className="shrink-0 text-blue-600" />
+            <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{receipt.name}</p><p className="text-xs text-slate-500">{(receipt.size / 1024 / 1024).toFixed(2)} MB · Selected</p></div>
+            <Button variant="ghost" size="icon" aria-label="Remove receipt" onClick={() => setReceipt(null)}><X size={16} /></Button>
+          </div>}
+          <p className="rounded-lg bg-blue-50 p-3 text-xs leading-5 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">Automatic data extraction is coming soon. For now, continue to enter the details manually. Your receipt is only selected locally and will not be saved.</p>
+          <div className="flex justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-800">
+            <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+            <Button size="sm" onClick={() => setEntryMethod('manual')} className="gap-1.5">Continue manually<ArrowRight size={14} /></Button>
+          </div>
+        </div> :
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
           {error && <p className="form-error" role="alert">{error}</p>}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -103,7 +159,9 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
               </label>
               <Input
                 type="tel"
-                placeholder="+1 (555) 000-0000"
+                placeholder="+91 98765 43210"
+                pattern="\+91[ ]*[6-9][0-9 ]{9,}"
+                title="Enter an Indian mobile number with +91 followed by 10 digits"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 required
@@ -128,18 +186,7 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
               <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 block">
                 Language
               </label>
-              <select
-                value={language}
-                onChange={(e) => setLanguage(e.target.value)}
-                className="w-full h-9 rounded-md border border-slate-200 bg-white px-3 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-800 dark:bg-slate-950"
-              >
-                <option value="English">English</option>
-                <option value="Spanish">Spanish</option>
-                <option value="Hindi">Hindi</option>
-                <option value="French">French</option>
-                <option value="German">German</option>
-                <option value="Other">Other</option>
-              </select>
+              <LanguageSelect id="borrower-language" label="Language" value={language} onChange={setLanguage}/>
             </div>
           </div>
 
@@ -222,7 +269,7 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
               {loading ? 'Adding...' : 'Create borrower'}
             </Button>
           </div>
-        </form>
+        </form>}
       </div>
     </DialogFrame>
   )

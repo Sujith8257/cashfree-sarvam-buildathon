@@ -1,3 +1,4 @@
+import { LanguageSelect } from './LanguageSelect'
 import { DialogFrame } from './ui/DialogFrame'
 import React, { useState } from 'react'
 import { Customer, AgentInteraction } from '@/types/database'
@@ -139,17 +140,7 @@ export const NewInteractionModal: React.FC<NewInteractionModalProps> = ({
               <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 block">
                 Language Used
               </label>
-              <select
-                value={languageUsed}
-                onChange={(e) => setLanguageUsed(e.target.value)}
-                className="w-full h-9 rounded-md border border-slate-200 bg-white px-3 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-800 dark:bg-slate-950"
-              >
-                <option value="English">English</option>
-                <option value="Spanish">Spanish</option>
-                <option value="Hindi">Hindi</option>
-                <option value="French">French</option>
-                <option value="German">German</option>
-              </select>
+              <LanguageSelect id="interaction-language" label="Language used" value={languageUsed} onChange={setLanguageUsed}/>
             </div>
 
             <div>

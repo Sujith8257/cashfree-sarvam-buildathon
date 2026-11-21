@@ -1,3 +1,4 @@
+import { Pagination, usePagination } from './Pagination'
 import React, { useState } from 'react'
 import { Customer, AgentInteraction } from '@/types/database'
 import { Button } from './ui/button'
@@ -74,6 +75,8 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
       }
       return sortOrder === 'desc' ? -comparison : comparison
     })
+
+  const { visible, controls } = usePagination(filtered, JSON.stringify([search, balanceFilter, languageFilter, sortBy, sortOrder]))
 
   return (
     <div className="space-y-4">
@@ -197,7 +200,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
-                {filtered.map((customer) => {
+                {visible.map((customer) => {
                   const callCount = interactions.filter(
                     (i) => i.customer_id === customer.customer_id
                   ).length
@@ -316,7 +319,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
       ) : (
         /* Grid / Card View */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((customer) => {
+          {visible.map((customer) => {
             const callCount = interactions.filter(
               (i) => i.customer_id === customer.customer_id
             ).length
@@ -384,6 +387,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({
           })}
         </div>
       )}
+      <Pagination {...controls}/>
     </div>
   )
 }

@@ -193,3 +193,11 @@ h1 { font-size:29px; line-height:1.25; font-weight:650; letter-spacing:-.8px; ma
 .auth-story-content p { margin-left:auto; margin-right:auto; }
 .auth-story-content .auth-assurance { justify-content:center; }
 @media(max-width:760px) { .auth-story-content { padding-bottom:0; } }
+
+
+.language-menu { position:relative; }
+.language-menu-trigger { width:100%; min-height:38px; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 12px; border:1px solid var(--line); border-radius:12px; background:var(--surface); color:var(--ink); font-size:13px; text-align:left; }
+.language-menu-options { position:absolute; top:calc(100% + 6px); left:0; right:0; z-index:60; padding:6px; border:1px solid var(--line); border-radius:14px; background:var(--surface); box-shadow:0 12px 32px #10281f24; max-height:250px; overflow-y:auto; }
+.language-menu-options button { display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%; padding:9px 11px; border:0; border-radius:8px; background:transparent; color:var(--ink); text-align:left; font-size:13px; }
+.language-menu-options button:hover,.language-menu-options button:focus-visible,.language-menu-options button[aria-checked="true"] { background:var(--accent-soft); color:var(--accent); }
+.language-menu-options .language-menu-add { justify-content:flex-start; border-top:1px solid var(--line); margin-top:4px; padding-top:12px; color:var(--accent); }
