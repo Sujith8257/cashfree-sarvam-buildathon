@@ -5,7 +5,7 @@ import re
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-_IST = timezone(timedelta(hours=5, minutes=30), "IST")
+IST = timezone(timedelta(hours=5, minutes=30), "IST")
 _CURRENCY = r"(?:₹|INR|Rs\.?)"
 _SIGNED_RUPEES = re.compile(
     r"([+-]?)\s*((?:\d+|\d{1,2}(?:,\d{2})*,\d{3}|\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?)"
@@ -62,7 +62,7 @@ def outreach_state(record: dict, now: datetime) -> tuple[str | None, str | None]
         if callback.utcoffset() is None or now.utcoffset() is None:
             raise ValueError("Callback and current time must include a timezone")
         if now < callback:
-            return "callback_wait", f"Callback requested for {callback.astimezone(_IST):%Y-%m-%d %H:%M %Z}."
+            return "callback_wait", f"Callback requested for {callback.astimezone(IST):%Y-%m-%d %H:%M %Z}."
         reasons.append("Requested callback time has arrived.")
     if 0 < paid < amount:
         rupees, paise = divmod(amount - paid, 100)
