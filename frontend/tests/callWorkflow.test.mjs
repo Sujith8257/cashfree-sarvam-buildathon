@@ -33,7 +33,9 @@ test('rejects unauthenticated, missing and other-owner borrowers without dispatc
   assert.equal((await invoke({ record: { ...customer, user_id: 'other' }, fetch })).statusCode, 404)
 })
 test('rejects missing configuration, invalid methods and malformed requests', async () => {
-  assert.equal((await invoke({ options: { ...config, CALL_WORKFLOW_URL: '' } })).statusCode, 503)
+  const missing = await invoke({ options: { ...config, CALL_WORKFLOW_URL: '' } })
+  assert.equal(missing.statusCode, 503)
+  assert.match(missing.body.error, /Missing server settings: CALL_WORKFLOW_URL/)
   assert.equal((await invoke({ method: 'GET' })).statusCode, 405)
   assert.equal((await invoke({ body: 'not JSON' })).statusCode, 400)
   assert.equal((await invoke({ body: { customer_id: 123, request_id: 'bad' } })).statusCode, 400)

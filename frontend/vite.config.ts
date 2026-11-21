@@ -23,9 +23,16 @@ export default defineConfig(({ mode }) => {
     async configureServer(server: import('vite').ViteDevServer) {
       const modulePath = new URL('./server/callWorkflow.mjs', import.meta.url).href
       const { createCallHandler } = await import(modulePath)
-      const handler = createCallHandler(env)
+      const receiptModulePath = new URL('./server/receiptParser.mjs', import.meta.url).href
+      const { createReceiptHandler } = await import(receiptModulePath)
+      server.middlewares.use('/api/parse-receipt', (req, res, next) => {
+        if (req.url?.split('?')[0] !== '/') { next(); return }
+        const handler = createReceiptHandler(loadEnv(mode, server.config.envDir, ['SUPABASE_URL', 'SUPABASE_PUBLISHABLE_KEY', 'VITE_SUPABASE_', 'CALL_WORKFLOW_TOKEN', 'SARVAM_API_KEY']))
+        void handler(req, res).catch(() => { if (!res.writableEnded) { res.statusCode = 500; res.end('{"error":"Receipt parsing failed."}') } })
+      })
       server.middlewares.use('/api/start-call', (req, res, next) => {
         if (req.url?.split('?')[0] !== '/') { next(); return }
+        const handler = createCallHandler(loadEnv(mode, server.config.envDir, ['SUPABASE_URL', 'SUPABASE_PUBLISHABLE_KEY', 'VITE_SUPABASE_', 'CALL_WORKFLOW_']))
         void handler(req, res).catch(() => { if (!res.writableEnded) { res.statusCode = 500; res.end('{"error":"Call request failed."}') } })
       })
     },

@@ -32,7 +32,11 @@ export function createCallHandler(config, dependencies = {}) {
     if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return reply(405, { error: 'Use POST.' }) }
     const authorization = req.headers.authorization || ''
     if (!/^Bearer \S+$/.test(authorization)) return reply(401, { error: 'Sign in to start a call.' })
-    if (!config.CALL_WORKFLOW_URL || !(config.SUPABASE_URL || config.VITE_SUPABASE_URL) || !(config.SUPABASE_PUBLISHABLE_KEY || config.VITE_SUPABASE_ANON_KEY)) return reply(503, { error: 'Calling is not configured. Set CALL_WORKFLOW_URL and Supabase settings on the server.' })
+    const missing = []
+    if (!config.CALL_WORKFLOW_URL?.trim()) missing.push('CALL_WORKFLOW_URL')
+    if (!(config.SUPABASE_URL || config.VITE_SUPABASE_URL)?.trim()) missing.push('SUPABASE_URL')
+    if (!(config.SUPABASE_PUBLISHABLE_KEY || config.VITE_SUPABASE_ANON_KEY)?.trim()) missing.push('SUPABASE_PUBLISHABLE_KEY')
+    if (missing.length) return reply(503, { error: `Calling is not configured. Missing server settings: ${missing.join(', ')}. Update the .env file in the app folder you are running.` })
     try {
       const url = new URL(config.CALL_WORKFLOW_URL)
       if (url.protocol !== 'https:' || url.username || url.password) return reply(503, { error: 'CALL_WORKFLOW_URL must be a valid HTTPS webhook URL.' })
