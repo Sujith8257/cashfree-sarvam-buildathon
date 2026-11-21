@@ -1,3 +1,4 @@
+import { Pagination, usePagination } from './Pagination'
 import React, { useState } from 'react'
 import { AgentInteraction, Customer } from '@/types/database'
 import { Button } from './ui/button'
@@ -65,6 +66,8 @@ export const InteractionsView: React.FC<InteractionsViewProps> = ({
 
     return matchSearch && matchStatus && matchPayment
   })
+
+  const { visible, controls } = usePagination(filtered, JSON.stringify([search, statusFilter, paymentFilter]))
 
   return (
     <div className="space-y-4">
@@ -161,7 +164,7 @@ export const InteractionsView: React.FC<InteractionsViewProps> = ({
         </div>
       ) : viewMode === 'timeline' ? (
         <div className="space-y-3">
-          {filtered.map((item) => {
+          {visible.map((item) => {
             const customer = customerMap.get(item.customer_id)
             const hasPtp = Boolean(item.promise_to_pay_amount || item.promise_to_pay_date)
 
@@ -293,7 +296,7 @@ export const InteractionsView: React.FC<InteractionsViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
-                {filtered.map((item) => {
+                {visible.map((item) => {
                   const customer = customerMap.get(item.customer_id)
 
                   return (
@@ -366,6 +369,7 @@ export const InteractionsView: React.FC<InteractionsViewProps> = ({
           </div>
         </div>
       )}
+      <Pagination {...controls}/>
     </div>
   )
 }
