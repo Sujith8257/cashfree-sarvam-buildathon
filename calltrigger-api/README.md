@@ -5,7 +5,7 @@ The lender photographs the loan notebook. Sarvam Document AI reads every row, an
 ## Run
 
 1. `pip install -r requirements.txt`
-2. In `.env`, set `SARVAM_API_KEY` for notebook OCR. Set `CALL_API_URL` only when you want to dispatch calls. Typed dry runs and the queue work without either key.
+2. Copy `.env.example` to `.env`; leave `TRIGGER_API_KEY` empty to have one generated, and use the same value in `frontend/.env`. In `.env`, set `SARVAM_API_KEY` for notebook OCR. Set `CALL_API_URL` only when you want to dispatch calls. Typed dry runs and the queue work without either key.
 3. `python trigger_api.py`, then open http://localhost:8000/docs for the API. `GET /queue` returns the queue; the React dashboard's call queue shows it too (see [frontend/README.md](../frontend/README.md)).
 4. The trigger key (`TRIGGER_API_KEY`) is created in `.env` on first start. Send it as the `X-API-Key` header (in `/docs`: **Authorize**).
 
