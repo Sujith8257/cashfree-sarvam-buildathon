@@ -6,7 +6,7 @@ The lender photographs the loan notebook. Sarvam Document AI reads every row, an
 
 1. `pip install -r requirements.txt`
 2. In `.env`, set `SARVAM_API_KEY` for notebook OCR. Set `CALL_API_URL` only when you want to dispatch calls. Typed dry runs and the queue work without either key.
-3. `python trigger_api.py`, then open http://localhost:8000/lender for the queue or http://localhost:8000/docs for the API.
+3. `python trigger_api.py`, then open http://localhost:8000/docs for the API. `GET /queue` returns the queue; the React dashboard's call queue shows it too (see [frontend/README.md](../frontend/README.md)).
 4. The trigger key (`TRIGGER_API_KEY`) is created in `.env` on first start. Send it as the `X-API-Key` header (in `/docs`: **Authorize**).
 
 ```powershell
@@ -23,7 +23,7 @@ The notebook dry run above returns `call_queue`. Read it from rank 1: only `woul
 
 If no one can be called (including outside calling hours), `call_queue` is `[]`. Check `results` for every row in its original order and the reason it was included or skipped. A dry run does not place calls.
 
-Dry runs now also register valid installments in local SQLite. Open **[the lender console](http://localhost:8000/lender)** with `TRIGGER_API_KEY` to see the queue across uploads and restarts. **Refresh payment** uses the server's `CASHFREE_PG_CLIENT_ID` and `CASHFREE_PG_CLIENT_SECRET` to fetch the installment's own sandbox link. Reporting a payment only pauses contact; it never clears a balance. A scheduled callback becomes eligible again at its requested time, subject to the calling window and other holds. See the [demo walkthrough](../docs/lender-queue-demo.md).
+Dry runs now also register valid installments in local SQLite. Call `GET /queue` with `TRIGGER_API_KEY` as `X-API-Key` to see the queue across uploads and restarts. `POST /queue/{iid}/refresh` uses the server's `CASHFREE_PG_CLIENT_ID` and `CASHFREE_PG_CLIENT_SECRET` to fetch the installment's own sandbox link. Reporting a payment only pauses contact; it never clears a balance. A scheduled callback becomes eligible again at its requested time, subject to the calling window and other holds. See the [demo walkthrough](../docs/lender-queue-demo.md).
 
 ## Endpoints
 
