@@ -18,6 +18,7 @@ from pydantic import BaseModel
 
 import cashfree_status
 import payment_store as store
+from review_notes import router as notes_router
 from queue_balance import installment_id, outreach_state, to_paise
 
 ENV_FILE = Path(__file__).with_name(".env")
@@ -341,6 +342,7 @@ def schedule_callback(iid: str, request: CallbackRequest):
     return queue_entry(store.set_callback(iid, at.isoformat()), now)
 
 
+queue_api.include_router(notes_router)
 app.include_router(queue_api)
 LENDER_DIR = Path(__file__).with_name("lender")
 app.mount("/lender/assets", StaticFiles(directory=LENDER_DIR), name="lender-assets")
