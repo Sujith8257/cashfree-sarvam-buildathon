@@ -193,7 +193,7 @@ def check_and_call(row, dry_run, now=None):
     endpoint = urlsplit(CALL_API_URL)
     is_relay = (endpoint.scheme == "https" and endpoint.hostname == "sandbox.cashfree.com"
                 and endpoint.path.startswith("/relay/inbound/webhook/"))
-    outbound = relay_call_payload(payload) if is_relay else payload
+    outbound = {"data": relay_call_payload(payload)} if is_relay else payload
     try:
         r = requests.post(CALL_API_URL, json=outbound, headers=headers, timeout=15)
     except requests.RequestException as e:

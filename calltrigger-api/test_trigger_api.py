@@ -91,7 +91,8 @@ def test_relay_webhook_receives_customer_fields_and_call_mapping(monkeypatch):
     monkeypatch.setattr(t.requests, "post", lambda url, json, headers, timeout: sent.append(json) or Ok())
     assert t.check_and_call(row(), dry_run=False, now=NOON)["status"] == "call_triggered"
 
-    payload = sent[0]
+    assert set(sent[0]) == {"data"}
+    payload = sent[0]["data"]
     customer_fields = {key: payload[key] for key in row()}
     assert customer_fields == {**row(), "language": "kn-IN", "interest_rate": 2.0}
     assert payload["event"] == "start_collection_call"
