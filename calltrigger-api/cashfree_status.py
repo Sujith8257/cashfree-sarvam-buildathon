@@ -22,10 +22,11 @@ def _phone(value):
     return None
 
 
-def _unique_fields(pairs):
+def unique_fields(pairs):
+    """Reject ambiguous fields in a provider response or webhook envelope."""
     fields = dict(pairs)
     if len(fields) != len(pairs):
-        raise ValueError("Duplicate JSON field")
+        raise ValueError("Duplicate field")
     return fields
 
 
@@ -69,7 +70,7 @@ def fetch_paid_paise(link_id: str, expected_paise: int, phone_number: str) -> in
         raise PaymentLookupError(502, "Payment provider did not return the link.")
 
     try:
-        data = response.json(parse_float=Decimal, object_pairs_hook=_unique_fields)
+        data = response.json(parse_float=Decimal, object_pairs_hook=unique_fields)
         if not isinstance(data, dict):
             raise ValueError
     except (ValueError, DecimalException, RecursionError):
