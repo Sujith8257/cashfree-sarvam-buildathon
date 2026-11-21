@@ -29,7 +29,7 @@ Dry runs now also register valid installments in local SQLite. Open **[the lende
 
 | Method | Path | Input | What it does |
 |---|---|---|---|
-| POST | `/trigger/notebook` | form-data: `file` (JPG/PNG/PDF), optional `language` (e.g. `hi-IN`), `dry_run` | Reads the page and triggers a call for every borrower who is due |
+| POST | `/trigger/notebook` | form-data: `file` (JPG/PNG/PDF), optional `language` (e.g. `hi-IN`), `dry_run`; optional query `?max_calls=N` | Reads the page and calls every borrower who is due, most overdue first; `max_calls` caps calls per run and reports the rest as `skipped` |
 | POST | `/trigger/call` | JSON with the notebook fields, `?dry_run=true` optional | Triggers one call without a photo |
 | GET | `/queue` | `X-API-Key` | Ranked eligible installments and all other rows with reasons |
 | POST | `/queue/{installment_id}/refresh` | `X-API-Key`; no body | Reconcile the cumulative amount paid from Cashfree; partial payments reduce the remaining balance |
