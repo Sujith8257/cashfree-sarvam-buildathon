@@ -35,6 +35,7 @@ Dry runs now also register valid installments in local SQLite. Open **[the lende
 | POST | `/queue/{installment_id}/refresh` | `X-API-Key`; no body | Reconcile the cumulative amount paid from Cashfree; partial payments reduce the remaining balance |
 | POST | `/queue/{installment_id}/already-paid` | `X-API-Key`; no body | Record a claim and hold outreach pending reconciliation |
 | POST | `/queue/{installment_id}/callback` | `X-API-Key`; JSON with offset-aware `callback_at` | Defer outreach to the requested time |
+| POST | `/queue/{installment_id}/review-note` | `X-API-Key`; form with `note` or short WAV `audio` | [Review code-mixed evidence](../docs/review-call-notes.md) with exact source quotes before taking a queue action |
 
 Notebook fields read: `customer_id, name, phone_number, email, language, lending_date, due_date, outstanding_amount, principal_amount, interest_rate`
 
