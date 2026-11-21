@@ -1,0 +1,28 @@
+# Deploy the frontend to Vercel
+
+## GitHub deployment
+
+1. Merge the frontend changes into the branch you want to deploy.
+2. Import `solstxce/cashfree-sarvam-buildathon` in Vercel.
+3. Set **Root Directory** to `frontend`, framework to **Vite**, and Node.js to a supported LTS (22.12+).
+4. Set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` for Production and Preview in Vercel Environment Variables. Use the public publishable/anon key, never a service-role key. The existing Vite configuration also accepts `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+5. Deploy. `vercel.json` installs with `npm ci`, builds with `npm run build`, and serves `dist`.
+6. In Supabase Authentication > URL Configuration, set Site URL to the production HTTPS URL and allow the corresponding signup confirmation redirect. Add any preview URLs you will use. Redeploy after changing build environment variables.
+
+## PowerShell deployment
+
+From the repository root:
+
+```powershell
+npx --yes --package=vercel vercel login
+.\frontend\scripts\deploy-vercel.ps1             # Preview
+.\frontend\scripts\deploy-vercel.ps1 -Production # Production
+```
+
+The script checks the local build, then starts Vercel's deployment flow. On the first run, choose the appropriate account and project. Follow the CLI instructions if the project uses a configured `frontend` Root Directory. Vercel project environment settings supply the cloud build's variables; a local `.env` is not a substitute. Do not commit `.env` or `.vercel`.
+
+## Backend boundary
+
+This deployment hosts the React frontend and its direct Supabase integration. The Vite `/api` proxy is a local development/preview feature, not a production server. Backend-dependent queue/call actions need a separately deployed collections API and an authenticated server-side proxy before they work on Vercel. The configuration deliberately excludes `/api` from the SPA fallback, so missing backend routes return 404 rather than HTML. Keep `TRIGGER_API_KEY` server-side. This script does not deploy the Python API or apply SQL migrations.
+
+The receipt selector is a local reference UI; it does not perform OCR or persist receipts.
