@@ -137,6 +137,34 @@ def test_preview_and_missing_endpoint_leave_daily_slot_free_and_next_ist_day_reo
     assert [call.kwargs["json"]["trigger_id"] for call in post.call_args_list] == [TRIGGER, "ledger-A-2026-11-20-2026-11-22"]
 
 
+@pytest.mark.parametrize('change,want', [('full', 'paid'), ('partial','needs_check'), ('stop','no_contact'),
+                                         ('claim','payment_hold'), ('promise','promise_wait')])
+def test_committed_change_during_call_preparation_wins_before_taking_the_daily_slot(api, monkeypatch, change, want):
+    monkeypatch.setattr(api, 'CALL_API_URL', RELAY)
+    original = api.relay_call_payload
+
+    def update_while_preparing(payload):
+        iid = payload['installment_id']
+        if change in ('full', 'partial'):
+            api.store.record_payment(iid, 12500 if change == 'full' else 5000)
+        elif change == 'claim':
+            api.store.mark_claim(iid)
+        elif change == 'stop':
+            api.contact_preferences.record(ROW['phone_number'], 'no_contact')
+        else:
+            request = api.promises.PromiseRequest(amount=10,promise_at=(NOON+timedelta(hours=2)).isoformat())
+            api.promises.record_promise(iid, request, NOON)
+        return original(payload)
+
+    monkeypatch.setattr(api, 'relay_call_payload', update_while_preparing)
+    sent = Mock(return_value=response(202))
+    monkeypatch.setattr(api.requests, 'post', sent)
+    result = api.check_and_call(ROW, False)
+    assert result['status'] == want
+    assert sent.call_count == 0
+    assert api.dispatch_ledger.states_for_day(NOON.date().isoformat()) == {}
+
+
 @pytest.mark.parametrize("outcome", [requests.ReadTimeout(), requests.ConnectionError(), 307, 409, 503])
 def test_uncertain_outcome_blocks_another_post_and_tells_operator_what_to_check(api, monkeypatch, outcome):
     post = Mock(side_effect=[response(outcome) if isinstance(outcome, int) else outcome])

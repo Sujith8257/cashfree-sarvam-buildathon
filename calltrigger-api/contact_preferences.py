@@ -37,10 +37,12 @@ def record(phone, reason):
                       WHERE borrower_contact_preferences.reason != 'no_contact'""", (phone, reason))
 
 
-def for_phone(phone):
-    with _table() as db:
+def for_phone(phone, *, db=None):
+    if db is not None:
         row = db.execute("SELECT reason FROM borrower_contact_preferences WHERE phone_number = ?", (phone,)).fetchone()
         return row[0] if row else None
+    with _table() as db:
+        return for_phone(phone, db=db)
 
 
 def all_by_phone():

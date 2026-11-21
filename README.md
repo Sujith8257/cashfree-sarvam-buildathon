@@ -2,12 +2,14 @@
 
 A sandbox prototype for collecting overdue installments through multilingual voice calls. Cashfree Relay orchestrates the workflow, Sarvam Indus handles the conversation, and Cashfree Payment Gateway hosts checkout.
 
+**Start here:** [Two-minute judge demo](docs/judge-demo.md) · [Lender screen setup](docs/lender-queue-demo.md) · [Seven-day ranking benchmark](evaluation/README.md).
+
 ## Demo flow
 
 1. Relay receives a synthetic borrower and installment record. The profile supplies the starting language, overdue amount, and contact details.
 2. Relay dispatches an outbound call using a committed Indus agent and a configured caller number.
-3. If the borrower requests a link, Relay creates or retrieves the Cashfree sandbox link for that installment. A callback request or a claim of prior payment instead updates the collections queue.
-4. A Cashfree event prompts a status lookup. Relay marks the installment paid only after Cashfree confirms payment.
+3. A separate Relay payment-request event creates or retrieves the sandbox link for that installment. In-call handoff needs a live rehearsal. The manager can record a callback, promise, hardship, or claim in the local queue.
+4. A Cashfree event prompts a status lookup. The trigger API records payment only after a separate authenticated sandbox lookup confirms the installment and amount.
 
 ## Build status
 

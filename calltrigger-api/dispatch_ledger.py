@@ -33,12 +33,17 @@ def states_for_day(ist_day):
         return dict(db.execute("SELECT installment_id, state FROM dispatch_ledger WHERE ist_day=?", (ist_day,)))
 
 
-def _reserve(key):
+def _reserve(key, trigger_id, check_policy):
     """Commit unknown before sending: process death must never make this slot available."""
     with _ledger(write=True) as db:
-        inserted = db.execute("""INSERT INTO dispatch_ledger (installment_id, ist_day, state)
-                                 VALUES (?, ?, 'unknown') ON CONFLICT (ist_day, installment_id) DO NOTHING""", key)
-        return None if inserted.rowcount else _state(db, key)
+        blocked = check_policy(db)
+        if blocked:
+            return blocked
+        previous = _state(db, key)
+        if previous is not None:
+            return outcome(trigger_id, previous)
+        db.execute("INSERT INTO dispatch_ledger (installment_id, ist_day, state) VALUES (?, ?, 'unknown')", key)
+        return None
 
 
 def outcome(trigger_id, state, status="skipped"):
@@ -53,10 +58,10 @@ def outcome(trigger_id, state, status="skipped"):
     return result
 
 
-def post_once(key, trigger_id, url, outbound, headers, *, relay):
-    previous = _reserve(key)
-    if previous is not None:
-        return outcome(trigger_id, previous)
+def post_once(key, trigger_id, url, outbound, headers, *, relay, check_policy):
+    blocked = _reserve(key, trigger_id, check_policy)
+    if blocked is not None:
+        return blocked
     try:
         # A 307/308 redirect would otherwise send a second POST on the same reservation.
         reply = requests.post(url, json=outbound, headers=headers, timeout=15, allow_redirects=False)

@@ -224,6 +224,7 @@ def queue_entry(record, now, *, preference_for=contact_preferences.for_phone, di
 
 def check_and_call(row, dry_run, now=None):
     """Register valid notebook rows even when outreach is deferred. Only dispatch eligible rows."""
+    fixed_time = now
     now = (now or now_ist()).astimezone(IST)
     customer_id = str(row.get("customer_id") or "").strip()
     name = str(row.get("name") or "").strip() or "Unknown"
@@ -287,11 +288,20 @@ def check_and_call(row, dry_run, now=None):
     is_relay = (endpoint.scheme == "https" and endpoint.hostname == "sandbox.cashfree.com"
                 and endpoint.path.startswith("/relay/inbound/webhook/"))
     outbound = {"data": relay_call_payload(payload)} if is_relay else payload
-    # A stop may arrive after this upload's first eligibility check. Check again at handoff.
-    if contact_preferences.for_phone(record["phone_number"]):
-        return queue_entry(store.get(iid), now)
+    # Share the reservation's write transaction: a payment, hold or promise committed first must win.
+    def check_policy(db):
+        instant = (fixed_time or now_ist()).astimezone(IST)
+        current = store._get(db, iid)
+        latest = queue_entry(current, instant, preference_for=lambda p: contact_preferences.for_phone(p, db=db),
+                             dispatches={})  # The ledger checks its own reservation in the same transaction.
+        if latest["status"] != "would_call":
+            return latest
+        if instant.date() != now.date() or record["paid_paise"] != current["paid_paise"]:
+            return {**latest, "status": "needs_check", "reason": "Balance or calling day changed. Refresh before calling."}
+        return None
+
     result = dispatch_ledger.post_once((iid, now.date().isoformat()), trigger_id, CALL_API_URL, outbound, headers,
-                                       relay=is_relay)
+                                       relay=is_relay, check_policy=check_policy)
     return {**payload, **result}
 
 
