@@ -14,7 +14,7 @@ Use **Inbound Webhook** as the trigger. Seed **Update initial Data** with a samp
 | Route | Action | Mapping |
 | --- | --- | --- |
 | `start_collection_call` | HTTP POST to Sarvam Instant Outbound | Use the committed agent version, telephony connection, caller number, and the validated profile phone and language. Map name, amount, and days past due to the agent variables. |
-| `create_payment_link` | Cashfree Payments → Create Payment Link | Map the verified amount, name, phone, and stable installment link ID. Use INR and a short purpose. |
+| `create_payment_link` | Cashfree Payments → Create Payment Link | Map the verified amount, name, phone, profile `email`, and stable installment link ID. Enable Send Email Notification. Use INR and a short purpose. |
 | `fetch_payment_status` | Cashfree Payments → Fetch Payment Link Details | Map the stored link ID and use the returned status to reconcile the installment. |
 | `PAYMENT_LINK_EVENT` | Cashfree Payments -> Fetch Payment Link Details | Read the nested event link ID. Fetch Cashfree state before treating it as paid. |
 | Unrecognized event | End the flow | Record the unsupported event for troubleshooting. |
@@ -49,11 +49,21 @@ The Instant Outbound endpoint is `POST https://apps.sarvam.ai/api/outbounds/v1/o
 
 Sarvam returns an `attempt_id` when it accepts the request. Confirm the call connected and used the intended language in the call logs. Add another supported borrower language, such as Tamil, and run the same check. [Sarvam call results](https://docs.sarvam.ai/voice-agents/api/instant-outbound/webhook-payload)
 
+After editing an existing workflow, run **Test flow → Execute** with a harmless sample to publish the draft. Reactivate the workflow and confirm the inbound URL executes the published version in Relay's run history.
+
+For this demo, copy the inbound URL from sandbox agent `43703`. Keep that endpoint in the trigger API configuration. Confirm the copied URL after any trigger or activation change.
+
 ## Verify the demo
 
-1. Run **Test Step** on the isolated payment node after selecting the sandbox connection. Confirm that Cashfree returns a link for the expected amount and installment.
+1. Submit a `create_payment_link` webhook event with a consenting test recipient's email. Confirm that Cashfree returns a link for the expected amount and installment and that the recipient receives it. Sandbox payment-link notifications support email. [Cashfree notification behavior](https://www.cashfree.com/docs/api-reference/payments/latest/payment-links/create-payment-link)
 2. Complete checkout in the sandbox. Fetch the link and verify the amount, currency, and `PAID` status before updating the queue.
-3. Run the phone workflow with two test profiles in distinct languages. Ask for a link on one call and request a callback on the other.
+3. Run the phone workflow with two test profiles in distinct languages. Relay's run history should show which branch a follow-up request selected. The in-call link request currently selects the default branch.
 4. Replay a link request and payment event. Check that the same installment link is reused and that payment state is applied once.
 
 [Create Payment Link](https://www.cashfree.com/docs/api-reference/payments/latest/payment-links/create-payment-link) · [Fetch Payment Link Details](https://www.cashfree.com/docs/api-reference/payments/latest/payment-links/fetch-payment-link-details) · [Payment Link Webhooks](https://www.cashfree.com/docs/api-reference/payments/latest/payment-links/webhooks)
+
+## Archive generated checkout URLs
+
+The local watcher reads successful Create Payment Link runs from the signed-in Cashfree Playwright profile. It saves their link ID, URL, amount, currency, status at creation, and timestamps to a private Supabase Storage bucket. Each link maps to `payment-link-logs/sandbox/<link_id>.json`. Contact details are omitted.
+
+Use a private JSON-only `payment-link-logs` bucket. Open the signed-in Playwright Chromium profile with CDP on local port `9227`. In the repository root, provide `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, and `RELAY_SANDBOX_AGENT_IDS` as process environment variables. Install `playwright` or point `RELAY_PLAYWRIGHT_MODULE` to its installed module. Run `node calltrigger-api/archive_relay_links.cjs` for one pass or add `--watch` to poll every 20 seconds. Keep the profile and watcher running for automatic logging.

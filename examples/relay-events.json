@@ -6,7 +6,7 @@
       "customer_id": "DEMO-BORROWER",
       "name": "Demo Borrower",
       "phone_number": "<VERIFIED_TEST_RECIPIENT_LOCAL>",
-      "email": "borrower@example.test",
+      "email": "<VERIFIED_TEST_RECIPIENT_EMAIL>",
       "language": "kn-IN",
       "lending_date": "2026-08-18",
       "due_date": "2026-11-18",
@@ -32,6 +32,7 @@
       "installment_id": "DEMO-INSTALLMENT",
       "borrower_name": "Demo Borrower",
       "phone": "<VERIFIED_TEST_RECIPIENT_E164>",
+      "email": "<VERIFIED_TEST_RECIPIENT_EMAIL>",
       "amount_due": 1200,
       "currency": "INR",
       "link_id": "demo-installment-link"
