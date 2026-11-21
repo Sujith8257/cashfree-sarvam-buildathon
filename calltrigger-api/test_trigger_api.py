@@ -1,5 +1,6 @@
 import os
 from datetime import date, datetime
+from functools import partial
 
 os.environ.setdefault("SARVAM_API_KEY", "test-sarvam-key")
 os.environ["TRIGGER_API_KEY"] = "test-trigger-key"
@@ -66,6 +67,33 @@ def test_unreadable_phone_is_not_called():
 
 def test_nothing_outstanding_is_not_called():
     assert t.check_and_call(row(outstanding_amount=0), dry_run=True, now=NOON)["status"] == "skipped"
+
+
+def test_notebook_preview_ranks_only_eligible_borrowers_by_due_date(monkeypatch):
+    rows = [
+        row(customer_id="tomorrow", due_date="2026-11-22"),
+        row(customer_id="today", due_date="2026-11-21"),
+        row(customer_id="paid", due_date="2026-11-01", outstanding_amount=0),
+        row(customer_id="late", name="Meera", due_date="16/11/2026", outstanding_amount=800),
+        row(customer_id="also-late", due_date="2026-11-16"),
+    ]
+    monkeypatch.setattr(t, "read_notebook", lambda *args: rows)
+    monkeypatch.setattr(t, "check_and_call", partial(t.check_and_call, now=NOON))
+    monkeypatch.setattr(t.requests, "post", lambda *a, **kw: pytest.fail("Preview tried to start a call"))
+
+    response = TestClient(t.app).post("/trigger/notebook", files={"file": ("page.png", b"fixture", "image/png")},
+                                      data={"dry_run": "true"}, headers={"X-API-Key": "test-trigger-key"})
+    assert response.status_code == 200
+    body = response.json()
+    assert "call_queue" in body
+    queue = body["call_queue"]
+    assert [(r["rank"], r["customer_id"]) for r in queue] == [
+        (1, "late"), (2, "also-late"), (3, "today"), (4, "tomorrow")]
+    assert queue[0]["name"] == "Meera"
+    assert queue[0]["outstanding_amount"] == 800
+    assert queue[0]["due_date"] == "2026-11-16"
+    assert [r["customer_id"] for r in body["results"]] == [r["customer_id"] for r in rows]
+    assert queue[0]["reason"] == body["results"][3]["reason"]
 
 
 def test_same_borrower_is_called_once_per_day(monkeypatch):

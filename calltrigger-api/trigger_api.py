@@ -206,13 +206,21 @@ def check_and_call(row, dry_run, now=None):
 
 @app.post("/trigger/notebook", dependencies=[Depends(require_key)])
 def trigger_from_notebook(file: UploadFile = File(...), language: str = Form(""), dry_run: bool = Form(False)):
-    """Upload a photo/PDF of the notebook page; triggers a call for every borrower who is due."""
+    """Upload a notebook page. With dry_run=true, preview whom to call first by earliest due date."""
     rows = read_notebook(file.file.read(), file.filename, file.content_type, language)
     results = [check_and_call(row, dry_run) for row in rows]
-    return {"rows_read": len(rows),
-            "calls": sum(r["status"] in ("call_triggered", "would_call") for r in results),
-            "results": results,
-            "extracted": rows}
+    response = {"rows_read": len(rows),
+                "calls": sum(r["status"] in ("call_triggered", "would_call") for r in results),
+                "results": results,
+                "extracted": rows}
+    if dry_run:
+        eligible = (r for r in results if r["status"] == "would_call")
+        fields = ("customer_id", "name", "due_date", "outstanding_amount", "reason")
+        response["call_queue"] = [
+            {"rank": rank, **{key: r[key] for key in fields}}
+            for rank, r in enumerate(sorted(eligible, key=lambda r: r["due_date"]), start=1)
+        ]
+    return response
 
 
 class Borrower(BaseModel):

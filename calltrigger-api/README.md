@@ -13,6 +13,16 @@ The lender photographs the loan notebook. Sarvam Document AI reads every row, an
 curl.exe -X POST http://localhost:8000/trigger/notebook -H "X-API-Key: <TRIGGER_API_KEY>" -F "file=@sample_notebook.png" -F "dry_run=true"
 ```
 
+### Who should I call first?
+
+The notebook dry run above returns `call_queue`. Read it from rank 1: only `would_call` rows appear, earliest due date first. Ties keep their notebook order. Each entry includes the borrower, outstanding amount in INR, and the reason from the eligibility check:
+
+```json
+{"rank": 1, "customer_id": "C001", "name": "Meera", "due_date": "2026-11-16", "outstanding_amount": 800, "reason": "5 day(s) overdue"}
+```
+
+If no one can be called (including outside calling hours), `call_queue` is `[]`. Check `results` for every row in its original order and the reason it was included or skipped. A dry run does not place calls.
+
 ## Endpoints
 
 | Method | Path | Input | What it does |
