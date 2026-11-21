@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Upload, Download, X } from 'lucide-react'
 import { DialogFrame } from './ui/DialogFrame'
 import { Button } from './ui/button'
 import { CSV_HEADERS, validateBorrowerCsv, type NewBorrower } from '@/lib/borrowerCsv'
 
 export function BulkImportModal({ onClose, onImport }: { onClose: () => void; onImport: (rows: NewBorrower[]) => Promise<void> }) {
+  const fileInput = useRef<HTMLInputElement>(null)
+  const [filename, setFilename] = useState('')
   const [borrowers, setBorrowers] = useState<NewBorrower[]>([])
   const [errors, setErrors] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
@@ -15,6 +17,8 @@ export function BulkImportModal({ onClose, onImport }: { onClose: () => void; on
     const link = document.createElement('a'); link.href = url; link.download = 'borrowers-template.csv'; link.click(); URL.revokeObjectURL(url)
   }
   const read = async (file?: File) => {
+    if (!file) return
+    setFilename(file.name)
     setBorrowers([]); setErrors([]); setDone(false)
     if (!file) return
     setReading(true)
@@ -37,7 +41,12 @@ export function BulkImportModal({ onClose, onImport }: { onClose: () => void; on
       {done ? <><p role="status">Imported {borrowers.length} borrowers successfully.</p><Button onClick={onClose}>Done</Button></> : <>
         <p className="text-sm">Upload up to 1,000 borrowers (2 MB). Required columns: name, phone_number, principal_amount. Dates use YYYY-MM-DD. Borrower IDs are generated automatically.</p>
         <Button variant="outline" onClick={template}><Download size={16}/>Download CSV template</Button>
-        <div><label htmlFor="borrower-csv" className="block text-sm font-medium mb-2">CSV file</label><input id="borrower-csv" type="file" accept=".csv,text/csv" disabled={busy || reading} onChange={event => { void read(event.target.files?.[0]) }}/></div>
+        <div className="rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-5 space-y-3">
+          <p className="text-sm font-medium">Upload your borrower CSV</p>
+          <input ref={fileInput} id="borrower-csv" type="file" accept=".csv,text/csv" hidden disabled={busy || reading} onChange={event => { const file = event.target.files?.[0]; void read(file); event.target.value = '' }}/>
+          <div className="flex flex-wrap items-center gap-3"><Button onClick={() => fileInput.current?.click()} disabled={busy || reading} aria-controls="borrower-csv"><Upload size={16}/>{reading ? 'Reading CSV…' : filename ? 'Choose another CSV' : 'Upload CSV'}</Button><span className="text-sm break-all" role="status">{filename || 'No CSV selected'}</span></div>
+          <p className="text-xs">Choose a .csv file from your device. Review the preview below, then select Import borrowers.</p>
+        </div>
         <p className="text-sm">This adds new borrower records. Existing records are not updated. Importing the same file again creates additional records.</p>
         {reading && <p role="status">Reading CSV…</p>}
         {!!errors.length && <div role="alert" className="form-error"><p>{errors.length} issue(s). No borrowers have been imported. Fix the file and upload it again.</p><ul>{errors.slice(0, 20).map((error, i) => <li key={i}>{error}</li>)}</ul>{errors.length > 20 && <p>Showing the first 20 issues.</p>}</div>}
