@@ -17,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import cashfree_status
+import contact_preferences
 import payment_store as store
 from queue_balance import installment_id, outreach_state, to_paise
 
@@ -151,11 +152,12 @@ def daily_trigger_id(record, today):
     return f"{record['customer_id'] or record['phone_number']}-{record['due_date']}-{today}"
 
 
-def queue_entry(record, now):
+def queue_entry(record, now, preference_for=contact_preferences.for_phone):
     """Use the same current balance, holds and contact rules for display and dispatch."""
     today = now.date()
     days = (today - datetime.fromisoformat(record["due_date"]).date()).days
-    status, reason = outreach_state(record, now)
+    preference = preference_for(record["phone_number"])
+    status, reason = contact_preferences.decision(preference, *outreach_state(record, now))
     if status is None:
         if days < -REMIND_DAYS_BEFORE:
             status, reason = "not_due", f"due on {record['due_date']}, too early to call"
@@ -171,7 +173,7 @@ def queue_entry(record, now):
             "name": record["name"], "due_date": record["due_date"], "days_overdue": max(0, days),
             "outstanding_amount": (record["amount_paise"] - record["paid_paise"]) / 100,
             "paid_amount": record["paid_paise"] / 100, "callback_at": record["callback_at"],
-            "status": status, "reason": reason}
+            "status": status, "reason": reason, "contact_preference": preference}
 
 
 def check_and_call(row, dry_run, now=None):
@@ -239,6 +241,9 @@ def check_and_call(row, dry_run, now=None):
     is_relay = (endpoint.scheme == "https" and endpoint.hostname == "sandbox.cashfree.com"
                 and endpoint.path.startswith("/relay/inbound/webhook/"))
     outbound = {"data": relay_call_payload(payload)} if is_relay else payload
+    # A stop may arrive after this upload's first eligibility check. Check again at handoff.
+    if contact_preferences.for_phone(record["phone_number"]):
+        return queue_entry(store.get(iid), now)
     try:
         r = requests.post(CALL_API_URL, json=outbound, headers=headers, timeout=15)
     except requests.RequestException as e:
@@ -303,7 +308,8 @@ def get_installment(iid):
 def lender_queue():
     """Evaluate the stored installments at read time, including callbacks that just became due."""
     now = now_ist()
-    rows = [queue_entry(record, now) for record in store.all_installments()]
+    preferences = contact_preferences.all_by_phone()
+    rows = [queue_entry(record, now, preferences.get) for record in store.all_installments()]
     return {"as_of": now.isoformat(), "call_queue": ranked_queue(rows),
             "other": [r for r in rows if r["status"] != "would_call"]}
 
@@ -322,6 +328,14 @@ def refresh_payment(iid: str):
 def report_paid(iid: str):
     get_installment(iid)
     return queue_entry(store.mark_claim(iid), now_ist())
+
+
+@queue_api.post("/{iid}/contact-preference")
+def stop_outreach(iid: str, request: contact_preferences.Request):
+    """Stop automated outreach to this registered phone across all this lender's installments."""
+    record = get_installment(iid)
+    contact_preferences.record(record["phone_number"], request.reason)
+    return queue_entry(record, now_ist())
 
 
 class CallbackRequest(BaseModel):

@@ -7,10 +7,13 @@ from datetime import date, datetime
 from pathlib import Path
 
 
+def database_path():
+    return os.getenv("COLLECTIONS_DB") or Path(__file__).with_name("collections.sqlite3")
+
+
 @contextmanager
 def _connection(*, write=False):
-    path = os.getenv("COLLECTIONS_DB") or Path(__file__).with_name("collections.sqlite3")
-    with closing(sqlite3.connect(path)) as db, db:
+    with closing(sqlite3.connect(database_path())) as db, db:
         db.row_factory = sqlite3.Row
         db.execute("""CREATE TABLE IF NOT EXISTS installments (
             installment_id TEXT PRIMARY KEY NOT NULL,
