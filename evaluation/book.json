@@ -1,0 +1,13 @@
+{
+  "as_of": "2026-11-21T12:00:00+05:30",
+  "rows": [
+    {"customer_id":"L006", "name":"Token Z", "language":"Telugu",   "phone_number":"6000000006", "due_date":"2026-11-10", "outstanding_amount":3000},
+    {"customer_id":"L004", "name":"Token A", "language":"Bengali",  "phone_number":"6000000004", "due_date":"2026-11-10", "outstanding_amount":2500},
+    {"customer_id":"L003", "name":"Token D", "language":"Tamil",    "phone_number":"6000000003", "due_date":"2026-11-21", "outstanding_amount":900},
+    {"customer_id":"L005", "name":"Token C", "language":"Kannada",  "phone_number":"6000000005", "due_date":"2026-11-14", "outstanding_amount":1500},
+    {"customer_id":"L008", "name":"Token H", "language":"Hindi",    "phone_number":"6000000008", "due_date":"2026-12-01", "outstanding_amount":5000},
+    {"customer_id":"L001", "name":"Token G", "language":"English",  "phone_number":"6000000001", "due_date":"2026-11-22", "outstanding_amount":2100},
+    {"customer_id":"L007", "name":"Token F", "language":"Gujarati", "phone_number":"6000000007", "due_date":"2026-11-01", "outstanding_amount":0},
+    {"customer_id":"L002", "name":"Token E", "language":"Marathi",  "phone_number":"6000000002", "due_date":"2026-11-19", "outstanding_amount":1100}
+  ]
+}
