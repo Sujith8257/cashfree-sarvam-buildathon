@@ -10,6 +10,7 @@
   const groups = [$('#call-next'), $('#deferred'), $('#paid')];
   const empty = ['No installments are eligible to call.', 'No installments are on hold or deferred.', 'No confirmed payments.'];
   const statuses = new Map(Object.entries({
+    no_contact: 'No contact requested', hardship: 'Hardship reported',
     would_call: 'Eligible to call', payment_hold: 'Payment claim on hold', callback_wait: 'Waiting for callback',
     not_due: 'Not due yet', blocked: 'Blocked', skipped: 'Skipped', paid: 'Payment confirmed', needs_check: 'Needs review'
   }));
@@ -146,7 +147,7 @@
     $('.received', item).textContent = amount(row.paid_amount);
     $('.status', item).textContent = status(row.status);
     $('.reason', item).textContent = reason(row.reason);
-    if (row.callback_at) { $('.callback-time', item).hidden = false; $('.callback-time', item).textContent = `Callback: ${time(row.callback_at)}`; }
+    if (row.callback_at && !row.contact_preference) { $('.callback-time', item).hidden = false; $('.callback-time', item).textContent = `Callback: ${time(row.callback_at)}`; }
 
     const id = String(row.installment_id ?? '').trim();
     if (!id || id === '.' || id === '..') {
@@ -165,6 +166,14 @@
         await loadQueue(signal, `${success} for ${name}.`, id);
       });
     }
+    const contact = $('.contact-actions', actions);
+    contact.hidden = row.contact_preference === 'no_contact';
+    for (const button of contact.querySelectorAll('[data-stop]')) {
+      const reason = button.dataset.stop;
+      button.hidden = row.contact_preference === reason;
+      button.addEventListener('click', () => update(button, 'Recording…', 'contact-preference', 'Automated outreach stopped across installments', { reason }));
+    }
+    callback.hidden = !!row.contact_preference;
     const refresh = $('.refresh', actions);
     refresh.addEventListener('click', () => update(refresh, 'Checking payment…', 'refresh', 'Payment refresh requested'));
     const claim = $('.claim', actions);

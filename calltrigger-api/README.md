@@ -34,6 +34,7 @@ Dry runs now also register valid installments in local SQLite. Open **[the lende
 | GET | `/queue` | `X-API-Key` | Ranked eligible installments and all other rows with reasons |
 | POST | `/queue/{installment_id}/refresh` | `X-API-Key`; no body | Reconcile the cumulative amount paid from Cashfree; partial payments reduce the remaining balance |
 | POST | `/queue/{installment_id}/already-paid` | `X-API-Key`; no body | Record a claim and hold outreach pending reconciliation |
+| POST | `/queue/{installment_id}/contact-preference` | `X-API-Key`; JSON `reason`: `no_contact` or `hardship` | [Stop automated outreach across installments](../docs/borrower-contact-preferences.md) at the registered phone for this lender |
 | POST | `/queue/{installment_id}/callback` | `X-API-Key`; JSON with offset-aware `callback_at` | Defer outreach to the requested time |
 | POST | `/queue/{installment_id}/review-note` | `X-API-Key`; form with `note` or short WAV `audio` | [Review code-mixed evidence](../docs/review-call-notes.md) with exact source quotes before taking a queue action |
 
