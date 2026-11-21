@@ -32,7 +32,6 @@ def clock(monkeypatch):
 @pytest.fixture
 def client(tmp_path, monkeypatch, clock):
     monkeypatch.setenv("COLLECTIONS_DB", str(tmp_path / "collections.sqlite3"))
-    monkeypatch.setattr(t, "triggered", set(), raising=False)
     monkeypatch.setattr(t, "read_notebook", lambda *args: [FIRST.copy()])
 
     def no_network(*args, **kwargs):
@@ -155,7 +154,7 @@ def test_callback_rejoins_at_its_instant_and_only_during_ist_calling_hours(clien
             assert_balance(held, 0, 1200)
             assert typed_call(client, dry_run=False)["status"] != "call_triggered"
 
-    dispatch = Mock(return_value=Mock(ok=True))
+    dispatch = Mock(return_value=Mock(status_code=200))
     monkeypatch.setattr(t.requests, "post", dispatch)
     assert typed_call(client, dry_run=False)["status"] == "call_triggered"
     assert dispatch.call_count == 1

@@ -19,6 +19,7 @@ from pydantic import BaseModel
 import cashfree_status
 import cashfree_webhook
 import contact_preferences
+import dispatch_ledger
 import payment_store as store
 import promise_reminders as promises
 from review_notes import router as notes_router
@@ -74,7 +75,6 @@ SCHEMA = {
 
 app = FastAPI(title="Loan call trigger")
 app.include_router(cashfree_webhook.router)
-triggered = set()  # shortcut: in-memory, forgets on restart; use a DB table before real use
 
 
 def require_key(key: str = Security(APIKeyHeader(name="X-API-Key"))):
@@ -190,7 +190,7 @@ def daily_trigger_id(record, today):
     return f"{record['customer_id'] or record['phone_number']}-{record['due_date']}-{today}"
 
 
-def queue_entry(record, now, preference_for=contact_preferences.for_phone):
+def queue_entry(record, now, *, preference_for=contact_preferences.for_phone, dispatches=None):
     """Use the same current balance, holds and contact rules for display and dispatch."""
     today = now.date()
     days = (today - datetime.fromisoformat(record["due_date"]).date()).days
@@ -201,24 +201,30 @@ def queue_entry(record, now, preference_for=contact_preferences.for_phone):
             status, reason = "not_due", f"due on {record['due_date']}, too early to call"
         elif not CALL_START <= now.hour < CALL_END:
             status, reason = "blocked", "outside 8 AM-7 PM calling hours"
-        elif daily_trigger_id(record, today) in triggered:
-            status, reason = "skipped", "already called today for this due date"
         else:
             due_reason = (f"{days} day(s) overdue" if days > 0 else
                           "due today" if days == 0 else f"due in {-days} day(s), reminder")
             status, reason = "would_call", f"{reason}; {due_reason}" if reason else due_reason
     status, reason = promises.apply_to_queue(record, now, status, reason)
-    return {"installment_id": record["installment_id"], "customer_id": record["customer_id"],
-            "name": record["name"], "due_date": record["due_date"], "days_overdue": max(0, days),
-            "outstanding_amount": (record["amount_paise"] - record["paid_paise"]) / 100,
-            "paid_amount": record["paid_paise"] / 100, "callback_at": record["callback_at"],
-            **({"promise": record["promise"]} if "promise" in record else {}),
-            "status": status, "reason": reason, "contact_preference": preference}
+    entry = {"installment_id": record["installment_id"], "customer_id": record["customer_id"],
+             "name": record["name"], "due_date": record["due_date"], "days_overdue": max(0, days),
+             "outstanding_amount": (record["amount_paise"] - record["paid_paise"]) / 100,
+             "paid_amount": record["paid_paise"] / 100, "callback_at": record["callback_at"],
+             **({"promise": record["promise"]} if "promise" in record else {}),
+             "status": status, "reason": reason, "contact_preference": preference}
+    iid = record["installment_id"]
+    state = dispatches.get(iid) if dispatches is not None else dispatch_ledger.state((iid, today.isoformat()))
+    if state is not None:
+        delivery = dispatch_ledger.outcome(daily_trigger_id(record, today), state)
+        if status != "would_call":  # Show the dispatch evidence without masking a payment, callback or hours hold.
+            delivery.update(status=status, reason=f"{reason} {delivery['reason']}")
+        entry.update(delivery)
+    return entry
 
 
 def check_and_call(row, dry_run, now=None):
     """Register valid notebook rows even when outreach is deferred. Only dispatch eligible rows."""
-    now = now or now_ist()
+    now = (now or now_ist()).astimezone(IST)
     customer_id = str(row.get("customer_id") or "").strip()
     name = str(row.get("name") or "").strip() or "Unknown"
     phone = parse_phone(row.get("phone_number"))
@@ -284,14 +290,9 @@ def check_and_call(row, dry_run, now=None):
     # A stop may arrive after this upload's first eligibility check. Check again at handoff.
     if contact_preferences.for_phone(record["phone_number"]):
         return queue_entry(store.get(iid), now)
-    try:
-        r = requests.post(CALL_API_URL, json=outbound, headers=headers, timeout=15)
-    except requests.RequestException as e:
-        return {**payload, "status": "call_api_error", "reason": str(e)}
-    if not r.ok:
-        return {**payload, "status": "call_api_error", "reason": f"{r.status_code} {r.text[:200]}"}
-    triggered.add(trigger_id)
-    return {**payload, "status": "call_triggered"}
+    result = dispatch_ledger.post_once((iid, now.date().isoformat()), trigger_id, CALL_API_URL, outbound, headers,
+                                       relay=is_relay)
+    return {**payload, **result}
 
 
 def ranked_queue(results):
@@ -357,7 +358,9 @@ def lender_queue():
     """Evaluate the stored installments at read time, including callbacks that just became due."""
     now = now_ist()
     preferences = contact_preferences.all_by_phone()
-    rows = [queue_entry(record, now, preferences.get) for record in store.all_installments()]
+    dispatches = dispatch_ledger.states_for_day(now.date().isoformat())
+    rows = [queue_entry(record, now, preference_for=preferences.get, dispatches=dispatches)
+            for record in store.all_installments()]
     return {"as_of": now.isoformat(), "call_queue": ranked_queue(rows),
             "other": [r for r in rows if r["status"] != "would_call"]}
 

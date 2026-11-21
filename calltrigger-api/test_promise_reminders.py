@@ -23,7 +23,6 @@ BORROWER = {"customer_id": "promise-fixture", "name": "Demo Borrower", "phone_nu
 def demo(tmp_path, monkeypatch):
     monkeypatch.setenv("COLLECTIONS_DB", str(tmp_path / "demo.sqlite3"))
     monkeypatch.setattr(api, "now_ist", lambda: NOON)
-    monkeypatch.setattr(api, "triggered", set())
     monkeypatch.setattr(api.requests.sessions.Session, "send", lambda *a, **kw: pytest.fail("Outbound HTTP"))
     with TestClient(api.app, headers={"X-API-Key": "test-trigger-key"}) as client:
         result = client.post("/trigger/call?dry_run=true", json=BORROWER)
